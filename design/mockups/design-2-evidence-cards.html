@@ -1,0 +1,248 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Noscia · 02 Evidence Cards</title>
+<style>
+  :root{
+    /* PALETTE: linen + sage (light, editorial) */
+    --bg:#f1eee4;--paper:#fbfaf3;--paper-2:#f5f2e9;--line:#e2dccd;--line-2:#ece7da;
+    --ink:#2a2c25;--muted:#6c6f63;--dim:#9a9b8d;
+    --accent:#5f7b56;--accent-deep:#445d3c;--accent-2:#a17c46;--accent-soft:rgba(95,123,86,.12);
+    --mark:rgba(95,123,86,.16);--mark-line:rgba(95,123,86,.6);
+    --framework:#5b7286;--regulator:#7e6480;--ratings:#a9852f;--report:#5f7b56;--ngo:#5d8060;--news:#a86a55;
+    --serif:"Iowan Old Style","Palatino Linotype",Palatino,Georgia,"Times New Roman",serif;
+    --ui:-apple-system,BlinkMacSystemFont,"Segoe UI",Inter,Roboto,Helvetica,Arial,sans-serif;
+    --mono:"SF Mono",ui-monospace,"JetBrains Mono",Menlo,Consolas,monospace;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--ink);font-family:var(--ui);-webkit-font-smoothing:antialiased;}
+  ::-webkit-scrollbar{width:11px}::-webkit-scrollbar-thumb{background:#d8d2c2;border-radius:6px;border:3px solid var(--bg)}
+
+  .switch{display:flex;align-items:center;gap:4px;height:36px;padding:0 14px;background:var(--paper-2);border-bottom:1px solid var(--line);font-family:var(--mono);font-size:11px;}
+  .switch .tag{color:var(--dim);margin-right:6px;letter-spacing:.1em}
+  .switch a{text-decoration:none;color:var(--dim);padding:4px 9px;border-radius:6px}
+  .switch a:hover{color:var(--ink);background:var(--line-2)}
+  .switch a.on{color:var(--accent-deep);background:var(--accent-soft)}
+  .switch .home{margin-left:auto}
+
+  /* app top bar */
+  .topbar{position:sticky;top:0;z-index:30;background:rgba(251,250,243,.92);backdrop-filter:blur(8px);border-bottom:1px solid var(--line);}
+  .topbar .row{max-width:920px;margin:0 auto;display:flex;align-items:center;gap:18px;padding:14px 24px}
+  .brand{display:flex;align-items:center;gap:10px;font-weight:700;font-size:16px;letter-spacing:-.01em}
+  .brand .lg{width:28px;height:28px;border-radius:8px;background:linear-gradient(135deg,var(--accent),var(--accent-2));display:grid;place-items:center;color:#fff;font-weight:800;font-size:14px}
+  .tabs{display:flex;gap:4px;margin-left:8px}
+  .tabs button{border:none;background:none;font-family:var(--ui);font-size:13.5px;color:var(--muted);padding:7px 13px;border-radius:9px;cursor:pointer}
+  .tabs button:hover{background:var(--paper-2);color:var(--ink)}
+  .tabs button.on{background:var(--accent-soft);color:var(--accent-deep);font-weight:600}
+  .savecount{margin-left:auto;font-family:var(--mono);font-size:11.5px;color:var(--dim)}
+
+  .stage{max-width:760px;margin:0 auto;padding:30px 24px 120px}
+  .view{display:none}.view.on{display:block}
+
+  /* search */
+  .qrow{display:flex;align-items:center;gap:12px;background:var(--paper);border:1px solid var(--line);border-radius:14px;padding:14px 18px;box-shadow:0 6px 26px -18px rgba(60,50,30,.3)}
+  .qrow:focus-within{border-color:var(--accent);box-shadow:0 0 0 3px var(--accent-soft)}
+  .qrow svg{color:var(--muted)} .qrow input{flex:1;border:none;outline:none;font-size:17px;color:var(--ink);background:none;font-family:var(--ui)}
+  .qrow .go{font-family:var(--mono);font-size:11px;color:var(--dim);border:1px solid var(--line);border-radius:6px;padding:4px 7px}
+
+  .summary{margin:26px 2px 8px;font-family:var(--serif);font-size:21px;line-height:1.58;letter-spacing:-.01em}
+  .summary mark{background:var(--mark);box-shadow:inset 0 -2px 0 var(--mark-line);border-radius:2px;padding:0 2px;color:inherit}
+  .cite{font-family:var(--ui);font-size:11px;font-weight:700;color:var(--accent-deep);background:var(--accent-soft);border-radius:5px;padding:1px 6px;margin:0 1px;cursor:pointer;vertical-align:.12em;position:relative;border:1px solid transparent}
+  .cite:hover{border-color:var(--accent)}
+  .cite .pop{position:absolute;left:50%;bottom:140%;transform:translateX(-50%) translateY(6px);width:280px;background:var(--ink);color:#f1eee4;border-radius:11px;padding:13px 14px;opacity:0;visibility:hidden;transition:.16s;z-index:20;box-shadow:0 16px 40px -12px rgba(0,0,0,.5);font-weight:400;text-align:left}
+  .cite:hover .pop{opacity:1;visibility:visible;transform:translateX(-50%) translateY(0)}
+  .cite .pop::after{content:"";position:absolute;left:50%;top:100%;transform:translateX(-50%);border:6px solid transparent;border-top-color:var(--ink)}
+  .cite .pop .pt{font-family:var(--mono);font-size:10px;letter-spacing:.05em;text-transform:uppercase;opacity:.6;margin-bottom:5px}
+  .cite .pop .pq{font-family:var(--serif);font-size:13px;line-height:1.5}
+  .cite .pop .pu{font-family:var(--mono);font-size:10px;opacity:.6;margin-top:7px;word-break:break-all}
+
+  .controls{display:flex;align-items:center;gap:14px;margin:30px 2px 14px}
+  .controls .lbl{font-family:var(--mono);font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:var(--dim)}
+  .chips{display:flex;gap:7px;flex-wrap:wrap}
+  .chip{font-family:var(--mono);font-size:11px;border:1px solid var(--line);background:var(--paper);border-radius:999px;padding:5px 11px;cursor:pointer;color:var(--muted);display:flex;align-items:center;gap:6px}
+  .chip .d{width:7px;height:7px;border-radius:50%}.chip.on{border-color:currentColor}
+  .toggle{margin-left:auto;display:flex;background:var(--paper);border:1px solid var(--line);border-radius:9px;padding:3px}
+  .toggle button{border:none;background:none;font-family:var(--mono);font-size:11px;color:var(--muted);padding:5px 11px;border-radius:6px;cursor:pointer}
+  .toggle button.on{background:var(--accent);color:#fff;font-weight:700}
+
+  .card{background:var(--paper);border:1px solid var(--line);border-radius:16px;padding:22px 24px;margin-bottom:16px;box-shadow:0 2px 0 rgba(60,50,30,.02);transition:.16s}
+  .card:hover{border-color:#d6cfbb;box-shadow:0 14px 34px -22px rgba(60,50,30,.4)}
+  .c-head{display:flex;align-items:center;gap:10px;margin-bottom:14px}
+  .favicon{width:26px;height:26px;border-radius:7px;display:grid;place-items:center;font-family:var(--mono);font-weight:700;font-size:12px;color:#fff;flex-shrink:0}
+  .c-org{font-weight:650;font-size:14px}.c-url{font-family:var(--mono);font-size:11px;color:var(--dim)}
+  .c-type{margin-left:auto;font-family:var(--mono);font-size:10px;text-transform:uppercase;letter-spacing:.07em;padding:3px 8px;border-radius:6px}
+  .quote{font-family:var(--serif);font-size:18.5px;line-height:1.62;letter-spacing:-.005em;color:#33352c;border-left:3px solid var(--accent);padding-left:16px;margin:0}
+  .quote mark{background:var(--mark);box-shadow:inset 0 -2px 0 var(--mark-line);border-radius:2px;padding:0 2px;color:inherit}
+  .c-foot{display:flex;align-items:center;gap:16px;margin-top:16px;padding-top:14px;border-top:1px solid var(--line-2);font-family:var(--mono);font-size:11.5px;color:var(--muted)}
+  .relev{display:flex;align-items:center;gap:6px;font-family:var(--mono);font-size:10.5px;color:var(--dim)}
+  .meter{width:38px;height:5px;border-radius:3px;background:var(--line);overflow:hidden}.meter i{display:block;height:100%;background:linear-gradient(90deg,var(--accent-2),var(--accent))}
+  .fresh{color:var(--ngo)}
+  .saveb{margin-left:auto;font-family:var(--mono);font-size:11px;color:var(--accent-deep);border:1px solid var(--line);background:none;border-radius:7px;padding:5px 10px;cursor:pointer}
+  .saveb:hover{border-color:var(--accent);background:var(--accent-soft)}
+  .saveb.saved{background:var(--accent);color:#fff;border-color:var(--accent)}
+  .missing{margin-top:8px;font-family:var(--mono);font-size:11px;color:var(--ratings);background:rgba(169,133,47,.08);border:1px dashed rgba(169,133,47,.4);border-radius:8px;padding:8px 11px}
+
+  /* collections */
+  .colhead{display:flex;align-items:baseline;gap:12px;margin:6px 2px 20px}
+  .colhead h1{font-family:var(--serif);font-size:28px;margin:0;letter-spacing:-.01em}
+  .colhead .c{font-family:var(--mono);font-size:12px;color:var(--dim)}
+  .folder{background:var(--paper);border:1px solid var(--line);border-radius:14px;padding:18px 20px;margin-bottom:14px}
+  .folder .fh{display:flex;align-items:center;gap:10px;margin-bottom:14px}
+  .folder .fh .ic{width:26px;height:26px;border-radius:8px;background:var(--accent-soft);display:grid;place-items:center;color:var(--accent-deep)}
+  .folder .fh h3{font-size:15px;margin:0;font-weight:660}.folder .fh .n{margin-left:auto;font-family:var(--mono);font-size:11px;color:var(--dim)}
+  .saved-q{border-left:3px solid var(--line);padding:6px 0 6px 14px;margin:10px 0;font-family:var(--serif);font-size:15px;color:#3a3c33}
+  .saved-q:hover{border-left-color:var(--accent)}
+  .saved-q .meta{font-family:var(--mono);font-size:10.5px;color:var(--dim);margin-top:4px}
+
+  /* settings (light) */
+  .setsec{margin:26px 2px 12px;font-family:var(--mono);font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:var(--dim)}
+  .prov{display:grid;grid-template-columns:repeat(auto-fill,minmax(250px,1fr));gap:14px}
+  .pcard{background:var(--paper);border:1px solid var(--line);border-radius:13px;padding:16px}
+  .pcard.active{border-color:var(--accent)}
+  .pcard .ph{display:flex;align-items:center;gap:10px;margin-bottom:12px}
+  .pi{width:30px;height:30px;border-radius:8px;display:grid;place-items:center;font-weight:800;font-family:var(--mono);font-size:13px;color:#fff}
+  .pn{font-weight:650}.pn small{display:block;font-family:var(--mono);font-size:10.5px;color:var(--dim);font-weight:400}
+  .keyrow{display:flex;gap:8px}.key{flex:1;background:var(--paper-2);border:1px solid var(--line);border-radius:8px;padding:9px 11px;color:var(--ink);font-family:var(--mono);font-size:12px;outline:none}
+  .key:focus{border-color:var(--accent)}
+  .barbtn{font-family:var(--mono);font-size:11px;color:var(--accent-deep);border:1px solid var(--line);background:none;border-radius:7px;padding:6px 10px;cursor:pointer}.barbtn:hover{border-color:var(--accent);background:var(--accent-soft)}
+  .keystate{font-family:var(--mono);font-size:10.5px;color:var(--ngo);margin-top:10px}.keystate.empty{color:var(--dim)}
+  .note{background:var(--paper-2);border:1px solid var(--line);border-left:3px solid var(--ratings);border-radius:10px;padding:13px 15px;font-size:12.5px;color:var(--muted);line-height:1.55;margin-top:22px}.note b{color:var(--ink)}
+  code{font-family:var(--mono);color:var(--ink)}
+</style>
+</head>
+<body>
+  <nav class="switch">
+    <span class="tag">NOSCIA · DESIGN</span>
+    <a href="design-1-research-console.html">01 Console</a>
+    <a class="on" href="design-2-evidence-cards.html">02 Cards</a>
+    <a href="design-3-entity-workbench.html">03 Workbench</a>
+    <a href="design-4-provenance-inspector.html">04 Provenance</a>
+    <a href="design-5-command-palette.html">05 Palette</a>
+    <a class="home" href="index.html">↩ gallery</a>
+  </nav>
+
+  <div class="topbar"><div class="row">
+    <div class="brand"><div class="lg">N</div>Noscia</div>
+    <div class="tabs">
+      <button class="on" data-view="search">Search</button>
+      <button data-view="collections">Collections</button>
+      <button data-view="settings">Settings</button>
+    </div>
+    <span class="savecount" id="savecount">3 saved passages</span>
+  </div></div>
+
+  <div class="stage">
+    <!-- SEARCH -->
+    <section class="view on" id="view-search">
+      <div class="qrow">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></svg>
+        <input value="What is the difference between Scope 2 and Scope 3 emissions?" spellcheck="false">
+        <span class="go">↵</span>
+      </div>
+      <div class="summary" id="summary"></div>
+      <div class="controls">
+        <span class="lbl">Filter sources</span>
+        <div class="chips" id="chips"></div>
+        <div class="toggle"><button class="on" data-tier="quality">Quality</button><button data-tier="fast">Fast</button></div>
+      </div>
+      <div id="cards"></div>
+    </section>
+
+    <!-- COLLECTIONS -->
+    <section class="view" id="view-collections">
+      <div class="colhead"><h1>Collections</h1><span class="c">passages and searches you've saved · grouped by topic</span></div>
+      <div class="folder">
+        <div class="fh"><div class="ic">◆</div><h3>Scope accounting</h3><span class="n">3 passages</span></div>
+        <div class="saved-q">"<mark style="background:var(--mark)">Scope 2 accounts for indirect emissions from purchased electricity…</mark>"<div class="meta">GHG Protocol · framework · saved 2d ago</div></div>
+        <div class="saved-q">"Scope 3 is on average more than 11 times larger than Scope 1 and 2 combined."<div class="meta">CDP · ngo · saved 2d ago</div></div>
+        <div class="saved-q">"Disclose absolute gross Scope 1, Scope 2 and Scope 3 emissions, with Scope 3 by category."<div class="meta">IFRS S2 · regulator · saved 5d ago</div></div>
+      </div>
+      <div class="folder">
+        <div class="fh"><div class="ic">◷</div><h3>Recent searches</h3><span class="n">4 queries</span></div>
+        <div class="saved-q" onclick="document.querySelector('.tabs button[data-view=search]').click()">What is the difference between Scope 2 and Scope 3 emissions?<div class="meta">6 results · just now</div></div>
+        <div class="saved-q">Companies walking back climate commitments<div class="meta">semantic · 12 results · 1h ago</div></div>
+        <div class="saved-q">SBTi validation vs commitment — what's the difference?<div class="meta">8 results · yesterday</div></div>
+        <div class="saved-q">CSRD double-materiality explained<div class="meta">9 results · 3d ago</div></div>
+      </div>
+    </section>
+
+    <!-- SETTINGS -->
+    <section class="view" id="view-settings">
+      <div class="colhead"><h1>Settings</h1><span class="c">bring your own key · stored in macOS Keychain, never on disk</span></div>
+      <div class="setsec">LLM providers</div>
+      <div class="prov" id="prov"></div>
+      <div class="setsec">Reading preferences</div>
+      <div class="prov">
+        <div class="pcard"><div class="pn" style="margin-bottom:10px">Default tier</div><div class="keyrow" style="gap:7px"><span class="chip on" style="cursor:default">Quality</span><span class="chip" style="cursor:default">Fast</span></div></div>
+        <div class="pcard"><div class="pn" style="margin-bottom:10px">Citation style</div><div class="keyrow" style="gap:7px"><span class="chip on" style="cursor:default">Hover popover</span><span class="chip" style="cursor:default">Footnotes</span></div></div>
+      </div>
+      <div class="note">⚠ <b>Dependency cooldown active.</b> pnpm <code>minimumReleaseAge: 10080</code> (7 days) + Renovate parity for the Python backend. Newly published packages are quarantined for a week before install.</div>
+    </section>
+  </div>
+
+<script>
+const tint=(c,a)=>`color-mix(in srgb, var(${c}) ${a}%, transparent)`;
+document.querySelectorAll('.tabs button').forEach(b=>b.onclick=()=>{
+  document.querySelectorAll('.tabs button').forEach(x=>x.classList.remove('on'));b.classList.add('on');
+  document.querySelectorAll('.view').forEach(v=>v.classList.toggle('on',v.id==='view-'+b.dataset.view));
+});
+
+const DATA=[
+ {org:"GHG Protocol",abbr:"GP",url:"ghgprotocol.org/scope-2-guidance",type:"framework",c:"--framework",relev:.97,fresh:true,crawled:"4d ago",
+  quote:"<mark>Scope 2 accounts for indirect emissions from the generation of purchased electricity, steam, heat or cooling</mark> consumed by the company — whereas <mark>Scope 3 includes all other indirect emissions across the value chain</mark>, upstream and downstream.",foot:"GHG Protocol Corporate Standard · §4"},
+ {org:"Global Reporting Initiative",abbr:"GRI",url:"globalreporting.org/standards/gri-305",type:"framework",c:"--framework",relev:.92,fresh:false,crawled:"11d ago",
+  quote:"305-2 covers energy indirect (Scope 2); <mark>305-3 covers other indirect (Scope 3) emissions</mark> — a consequence of activities but <mark>from sources the organisation does not own or control</mark>.",foot:"GRI 305: Emissions 2016"},
+ {org:"CDP",abbr:"CDP",url:"cdp.net/guidance/scope-3-technical-note",type:"ngo",c:"--ngo",relev:.86,fresh:true,crawled:"2d ago",
+  quote:"For most disclosing companies, <mark>Scope 3 emissions are on average more than 11 times larger than operational (Scope 1 and 2) emissions</mark> — so a target omitting Scope 3 leaves out the majority of impact.",foot:"CDP Technical Note"},
+ {org:"ISSB / IFRS",abbr:"S2",url:"ifrs.org/issb/ifrs-s2/ghg-emissions",type:"regulator",c:"--regulator",relev:.81,fresh:false,crawled:"9d ago",
+  quote:"An entity shall disclose <mark>absolute gross Scope 1, Scope 2 and Scope 3 emissions</mark> under the GHG Protocol, with <mark>Scope 3 broken into value-chain categories</mark>.",foot:"IFRS S2 · cross-industry metrics",
+  missing:"Scope 3 first-period transition relief — citation not yet indexed for this clause."},
+ {org:"MSCI ESG Research",abbr:"M",url:"msci.com/esg/methodology/carbon-emissions",type:"ratings",c:"--ratings",relev:.74,fresh:false,crawled:"16d ago",
+  quote:"<mark>Scope 2 is derived from disclosed purchased-energy consumption and grid factors</mark>; where issuers don't report, <mark>Scope 3 is estimated using a sector input-output model</mark> and flagged as estimated.",foot:"MSCI Carbon Emissions Methodology"}
+];
+const TYPES=[["framework","--framework"],["regulator","--regulator"],["ratings","--ratings"],["ngo","--ngo"],["report","--report"]];
+let active=new Set(TYPES.map(t=>t[0])),tier='quality',saved=3;
+
+document.getElementById('summary').innerHTML=
+ `Across the indexed frameworks the distinction is consistent: <mark>Scope 2 is the single category of purchased energy</mark> a company consumes`+
+ `<span class="cite">1<span class="pop"><div class="pt">GHG Protocol · framework</div><div class="pq">"…indirect emissions from the generation of purchased electricity, steam, heat or cooling…"</div><div class="pu">ghgprotocol.org/scope-2-guidance</div></span></span>, `+
+ `while <mark>Scope 3 is the broad remainder of value-chain emissions</mark> it influences but does not own`+
+ `<span class="cite">2<span class="pop"><div class="pt">GRI 305 · framework</div><div class="pq">"…other indirect emissions… from sources it does not own or control."</div><div class="pu">globalreporting.org/standards/gri-305</div></span></span> `+
+ `— and for most companies that remainder is by far the larger figure`+
+ `<span class="cite">3<span class="pop"><div class="pt">CDP · ngo</div><div class="pq">"…on average more than 11 times larger than Scope 1 and 2…"</div><div class="pu">cdp.net/guidance/scope-3-technical-note</div></span></span>.`;
+
+function renderChips(){
+  document.getElementById('chips').innerHTML=TYPES.map(([t,c])=>`<span class="chip ${active.has(t)?'on':''}" data-t="${t}" style="color:${active.has(t)?`var(${c})`:'var(--muted)'}"><span class="d" style="background:var(${c})"></span>${t}</span>`).join('');
+  document.querySelectorAll('.chip[data-t]').forEach(el=>el.onclick=()=>{const t=el.dataset.t;active.has(t)?active.delete(t):active.add(t);renderChips();renderCards();});
+}
+function renderCards(){
+  const list=DATA.filter(d=>active.has(d.type)).sort((a,b)=>b.relev-a.relev);
+  document.getElementById('cards').innerHTML=list.map(d=>`<div class="card">
+    <div class="c-head"><div class="favicon" style="background:var(${d.c})">${d.abbr}</div>
+      <div><div class="c-org">${d.org}</div><div class="c-url">${d.url}</div></div>
+      <span class="c-type" style="color:var(${d.c});background:${tint(d.c,12)}">${d.type}</span></div>
+    <blockquote class="quote">${d.quote}</blockquote>
+    ${d.missing?`<div class="missing">⚠ ${d.missing}</div>`:''}
+    <div class="c-foot"><span class="relev"><span class="meter"><i style="width:${Math.round(d.relev*100)}%"></i></span>${d.relev.toFixed(2)} match</span>
+      <span>${d.foot}</span><span>${d.fresh?'<span class="fresh">● fresh</span> · ':''}${d.crawled}</span>
+      <button class="saveb">＋ save</button></div></div>`).join('');
+  document.querySelector('.summary').style.opacity=tier==='fast'?.4:1;
+  document.querySelectorAll('.saveb').forEach(b=>b.onclick=()=>{
+    b.classList.toggle('saved');const on=b.classList.contains('saved');b.textContent=on?'✓ saved':'＋ save';
+    saved+=on?1:-1;document.getElementById('savecount').textContent=`${saved} saved passages`;
+  });
+}
+document.querySelectorAll('.toggle button').forEach(b=>b.onclick=()=>{document.querySelectorAll('.toggle button').forEach(x=>x.classList.remove('on'));b.classList.add('on');tier=b.dataset.tier;renderCards();});
+
+const PROV=[["Anthropic","A","--news",true,"claude-opus-4-8","sk-ant-•••••••••••3xQ"],["OpenAI","O","--report",false,"gpt-5",""],["OpenRouter","R","--regulator",false,"any model",""],["Ollama","L","--framework",true,"local · no key","localhost:11434"]];
+document.getElementById('prov').innerHTML=PROV.map(p=>`<div class="pcard ${p[3]?'active':''}">
+  <div class="ph"><div class="pi" style="background:var(${p[2]})">${p[1]}</div><div class="pn">${p[0]}<small>${p[4]}</small></div></div>
+  ${p[0]==='Ollama'?`<div class="keystate">● connected · ${p[5]}</div>`:`<div class="keyrow"><input class="key" value="${p[5]}" ${p[5]?'':'placeholder="paste API key…"'}><button class="barbtn">save</button></div><div class="keystate ${p[3]?'':'empty'}">${p[3]?'● saved to Keychain':'○ no key stored'}</div>`}
+</div>`).join('');
+
+renderChips();renderCards();
+</script>
+</body>
+</html>

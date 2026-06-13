@@ -1,0 +1,223 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Noscia · 05 Command Palette</title>
+<style>
+  :root{
+    /* PALETTE: graphite + warm amber (near-monochrome) */
+    --bg:#18171a;--haze:#201f22;--panel:#232125;--panel-2:#1d1c1f;--field:#161518;
+    --line:#36333b;--line-2:#262329;--hover:#2a282e;--sel:#2e2a26;
+    --ink:#e9e6e2;--muted:#9b958f;--dim:#6c6660;
+    --accent:#cda468;--accent-2:#b88f55;--accent-soft:rgba(205,164,104,.14);
+    --framework:#8b97a3;--regulator:#a08a9b;--ratings:#c2a368;--report:#92a07c;--ngo:#7f9173;--news:#bd8a76;
+    --sans:-apple-system,BlinkMacSystemFont,"Segoe UI",Inter,Roboto,Helvetica,Arial,sans-serif;
+    --mono:"SF Mono",ui-monospace,"JetBrains Mono",Menlo,Consolas,monospace;
+  }
+  *{box-sizing:border-box}html,body{height:100%}
+  body{margin:0;background:
+    radial-gradient(1100px 520px at 50% -8%, rgba(205,164,104,.07), transparent 60%),
+    var(--bg);color:var(--ink);font-family:var(--sans);-webkit-font-smoothing:antialiased;display:flex;flex-direction:column;height:100vh;overflow:hidden}
+  ::-webkit-scrollbar{width:9px}::-webkit-scrollbar-thumb{background:#3c3941;border-radius:6px;border:2px solid var(--bg)}
+
+  .switch{display:flex;align-items:center;gap:4px;height:38px;padding:0 12px;background:#100f12;border-bottom:1px solid var(--line-2);flex-shrink:0;font-family:var(--mono);font-size:11.5px}
+  .switch .tag{color:var(--dim);margin-right:6px;letter-spacing:.1em;font-size:10px}
+  .switch a{text-decoration:none;color:var(--dim);padding:4px 9px;border-radius:6px}.switch a:hover{color:var(--ink);background:#1c1b1f}.switch a.on{color:var(--accent);background:var(--accent-soft)}.switch .home{margin-left:auto}
+
+  .center{flex:1;display:flex;flex-direction:column;align-items:center;min-height:0;padding-top:6vh}
+  .kicker{font-family:var(--mono);font-size:11px;letter-spacing:.22em;text-transform:uppercase;color:var(--dim);margin-bottom:14px}.kicker b{color:var(--accent)}
+
+  .palette{width:min(920px,94vw);background:linear-gradient(180deg,#262428,#1f1d21);border:1px solid var(--line);border-radius:18px;box-shadow:0 40px 90px -30px rgba(0,0,0,.8);overflow:hidden;display:flex;flex-direction:column;min-height:0;max-height:80vh}
+  .pq{display:flex;align-items:center;gap:13px;padding:17px 20px;border-bottom:1px solid var(--line)}
+  .pq .crumb{font-family:var(--mono);font-size:11px;color:var(--accent);background:var(--accent-soft);border:1px solid var(--line);border-radius:7px;padding:5px 9px;white-space:nowrap}
+  .pq svg{color:var(--accent)}.pq input{flex:1;background:none;border:none;outline:none;color:var(--ink);font-size:19px;font-family:var(--sans);font-weight:500}
+  .pq .seg{display:flex;gap:3px;background:var(--field);border:1px solid var(--line);border-radius:9px;padding:3px}.pq .seg button{background:none;border:none;font-family:var(--mono);font-size:11px;color:var(--muted);padding:6px 12px;border-radius:6px;cursor:pointer;display:flex;align-items:center;gap:6px}.pq .seg button.on{background:var(--accent);color:#2a2012;font-weight:700}.pq .seg .lat{font-size:9px;opacity:.8}
+
+  .modes{display:flex;gap:4px;padding:9px 16px;border-bottom:1px solid var(--line);background:var(--panel-2)}
+  .modes button{background:none;border:none;font-family:var(--mono);font-size:11.5px;color:var(--muted);padding:6px 12px;border-radius:7px;cursor:pointer;display:flex;align-items:center;gap:7px}
+  .modes button:hover{background:var(--hover);color:var(--ink)}.modes button.on{background:var(--accent-soft);color:var(--accent)}
+  .modes kbd{font-family:var(--mono);font-size:9px;border:1px solid var(--line);border-radius:4px;padding:0 4px;color:var(--dim)}
+
+  .palette-body{display:grid;grid-template-columns:1fr 320px;min-height:0;flex:1}
+  .reslist{overflow-y:auto;padding:8px}
+  .group{font-family:var(--mono);font-size:10px;letter-spacing:.1em;text-transform:uppercase;color:var(--dim);padding:10px 12px 6px}
+  .row{display:flex;align-items:center;gap:12px;padding:11px 13px;border-radius:11px;cursor:pointer;border:1px solid transparent}
+  .row:hover{background:var(--hover)}.row.sel{background:var(--sel);border-color:rgba(205,164,104,.3)}
+  .ico{width:30px;height:30px;border-radius:8px;flex-shrink:0;display:grid;place-items:center;font-family:var(--mono);font-weight:700;font-size:12px;color:#2a2012}
+  .ico.cmd{background:var(--field);color:var(--accent);border:1px solid var(--line);font-size:15px}
+  .row .main{min-width:0;flex:1}.row .t{font-size:14px;font-weight:560;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .row .t mark{background:var(--accent-soft);box-shadow:inset 0 -2px 0 var(--accent);border-radius:2px;padding:0 2px;color:#f4ead7}
+  .row .s{font-family:var(--mono);font-size:11px;color:var(--dim);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-top:2px}
+  .row .meta{display:flex;align-items:center;gap:8px;flex-shrink:0}
+  .stype{font-family:var(--mono);font-size:9px;text-transform:uppercase;letter-spacing:.05em;padding:2px 6px;border-radius:5px}.ret{font-family:var(--mono);font-size:10px;color:var(--dim)}
+  .kbdhint{font-family:var(--mono);font-size:10px;color:var(--dim);border:1px solid var(--line);border-radius:5px;padding:1px 6px}
+
+  .peek{border-left:1px solid var(--line);background:var(--panel-2);overflow-y:auto;padding:18px}
+  .peek .ptype{font-family:var(--mono);font-size:10px;text-transform:uppercase;letter-spacing:.08em;padding:3px 8px;border-radius:6px;display:inline-block}
+  .peek .ph{font-size:15px;font-weight:660;line-height:1.32;margin:12px 0 4px}.peek .pu{font-family:var(--mono);font-size:10.5px;color:var(--accent-2);word-break:break-all;margin-bottom:14px}
+  .peek .pass{font-size:13px;line-height:1.62;color:#cfc8bf}.peek .pass mark{background:var(--accent-soft);box-shadow:inset 0 -2px 0 var(--accent);border-radius:2px;padding:1px 2px;color:#f4ead7}
+  .peek .pmeta{margin-top:16px;padding-top:14px;border-top:1px solid var(--line);font-family:var(--mono);font-size:11px;color:var(--muted);display:flex;flex-direction:column;gap:7px}.peek .pmeta .r{display:flex;justify-content:space-between}.peek .pmeta b{color:var(--ink);font-weight:600}
+  .peekempty{height:100%;display:grid;place-items:center;color:var(--dim);font-family:var(--mono);font-size:11px;text-align:center;padding:30px}
+
+  .footbar{display:flex;align-items:center;gap:18px;padding:10px 18px;border-top:1px solid var(--line);font-family:var(--mono);font-size:11px;color:var(--dim);flex-shrink:0}
+  .footbar .k{display:inline-flex;align-items:center;gap:5px}.footbar kbd{font-family:var(--mono);background:var(--field);border:1px solid var(--line);border-radius:5px;padding:1px 6px;color:var(--muted);font-size:10px}.footbar .hint{margin-left:auto;color:var(--muted)}
+
+  /* settings sheet */
+  .sheetwrap{position:fixed;inset:0;display:grid;place-items:center;z-index:60;opacity:0;visibility:hidden;transition:.18s}.sheetwrap.on{opacity:1;visibility:visible}
+  .sheetwrap .bg{position:absolute;inset:0;background:rgba(0,0,0,.55)}
+  .sheet{position:relative;width:560px;max-width:92vw;background:var(--panel);border:1px solid var(--line);border-radius:16px;box-shadow:0 40px 90px -30px rgba(0,0,0,.8);overflow:hidden}
+  .sheet .sh{display:flex;align-items:center;padding:16px 20px;border-bottom:1px solid var(--line)}.sheet .sh h3{margin:0;font-size:15px}.sheet .sh .x{margin-left:auto;background:none;border:none;color:var(--dim);font-size:18px;cursor:pointer}
+  .sheet .sb{padding:18px 20px;max-height:60vh;overflow:auto}
+  .prov{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+  .pcard{background:var(--field);border:1px solid var(--line);border-radius:11px;padding:13px}.pcard.active{border-color:var(--accent)}
+  .pcard .ph{display:flex;align-items:center;gap:9px;margin-bottom:10px}.pi{width:26px;height:26px;border-radius:7px;display:grid;place-items:center;font-weight:800;font-family:var(--mono);font-size:12px;color:#2a2012}
+  .pn{font-weight:640;font-size:13px}.pn small{display:block;font-family:var(--mono);font-size:10px;color:var(--dim);font-weight:400}
+  .key{width:100%;background:var(--panel-2);border:1px solid var(--line);border-radius:8px;padding:8px 10px;color:var(--ink);font-family:var(--mono);font-size:11.5px;outline:none}.key:focus{border-color:var(--accent)}
+  .keystate{font-family:var(--mono);font-size:10px;color:var(--ngo);margin-top:8px}.keystate.empty{color:var(--dim)}
+  .note{background:var(--field);border:1px solid var(--line);border-left:3px solid var(--accent);border-radius:10px;padding:12px 14px;font-size:12px;color:var(--muted);line-height:1.55;margin-top:16px}.note b{color:var(--ink)}
+  code{font-family:var(--mono);color:var(--ink)}
+</style>
+</head>
+<body>
+  <nav class="switch">
+    <span class="tag">NOSCIA · DESIGN</span>
+    <a href="design-1-research-console.html">01 Console</a>
+    <a href="design-2-evidence-cards.html">02 Cards</a>
+    <a href="design-3-entity-workbench.html">03 Workbench</a>
+    <a href="design-4-provenance-inspector.html">04 Provenance</a>
+    <a class="on" href="design-5-command-palette.html">05 Palette</a>
+    <a class="home" href="index.html">↩ gallery</a>
+  </nav>
+
+  <div class="center">
+    <div class="kicker">Noscia · <b>↑↓</b> move · <b>↵</b> open · <b>1–4</b> switch mode · <b>⌘K</b> commands</div>
+    <div class="palette">
+      <div class="pq">
+        <span class="crumb" id="crumb">Search</span>
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></svg>
+        <input id="q" value="Scope 2 vs Scope 3 emissions" spellcheck="false" autofocus>
+        <div class="seg"><button class="on" data-t="fast">⚡ Fast<span class="lat">184ms</span></button><button data-t="quality">◆ Quality<span class="lat">+rerank</span></button></div>
+      </div>
+      <div class="modes">
+        <button class="on" data-mode="search"><kbd>1</kbd> Search</button>
+        <button data-mode="entity"><kbd>2</kbd> Entity</button>
+        <button data-mode="commands"><kbd>3</kbd> Commands</button>
+        <button data-mode="recent"><kbd>4</kbd> Recent</button>
+      </div>
+      <div class="palette-body">
+        <div class="reslist" id="reslist"></div>
+        <div class="peek" id="peek"><div class="peekempty">↵ or hover a result<br>to peek the cited passage</div></div>
+      </div>
+      <div class="footbar">
+        <span class="k"><kbd>↵</kbd> open</span><span class="k"><kbd>⌘</kbd><kbd>K</kbd> commands</span><span class="k"><kbd>Tab</kbd> cycle mode</span>
+        <span class="hint" id="hint">6 passages · dense-only · local index</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- settings sheet -->
+  <div class="sheetwrap" id="sheet">
+    <div class="bg" id="sheetbg"></div>
+    <div class="sheet">
+      <div class="sh"><h3>Settings · bring your own key</h3><button class="x" id="sheetx">✕</button></div>
+      <div class="sb">
+        <div class="prov" id="prov"></div>
+        <div class="note">Keys live in the macOS Keychain via <code>keyring</code>, read per call — never on disk. Plain search needs no key. ⚠ pnpm <code>minimumReleaseAge: 10080</code> (7-day cooldown) is enforced.</div>
+      </div>
+    </div>
+  </div>
+
+<script>
+const tint=(c,a)=>`color-mix(in srgb, var(${c}) ${a}%, transparent)`;
+const SEARCH=[
+ {abbr:"GP",stype:"framework",c:"--framework",org:"GHG Protocol",ret:"dense 0.71",title:'<mark>Scope 2</mark> Guidance — purchased energy emissions',url:"ghgprotocol.org/scope-2-guidance",sub:"Defines Scope 2 vs Scope 3 boundary",pass:'<mark>Scope 2 accounts for indirect emissions from the generation of purchased electricity, steam, heat or cooling</mark>, whereas <mark>Scope 3 includes all other indirect emissions across the value chain</mark>.',score:.97,crawled:"4d ago"},
+ {abbr:"GRI",stype:"framework",c:"--framework",org:"GRI",ret:"dense 0.74",title:'GRI 305 — Disclosure 305-3 (<mark>Scope 3</mark>)',url:"globalreporting.org/standards/gri-305",sub:"Scope 2 and Scope 3 reported separately",pass:'305-2 covers energy indirect (Scope 2); <mark>305-3 covers other indirect (Scope 3) emissions</mark> from sources the organisation does not own or control.',score:.92,crawled:"11d ago"},
+ {abbr:"CDP",stype:"ngo",c:"--ngo",org:"CDP",ret:"bm25 0.61",title:'Technical Note — relevance of <mark>Scope 3</mark>',url:"cdp.net/guidance/scope-3-technical-note",sub:"Scope 3 ≈ 11× operational emissions",pass:'For most disclosing companies, <mark>Scope 3 emissions are on average more than 11 times larger than Scope 1 and 2 combined</mark>.',score:.86,crawled:"2d ago"},
+ {abbr:"S2",stype:"regulator",c:"--regulator",org:"ISSB / IFRS",ret:"dense 0.63",title:'IFRS S2 — gross <mark>Scope 1, 2 and 3</mark> disclosure',url:"ifrs.org/issb/ifrs-s2/ghg-emissions",sub:"Mandates all three scopes, S3 by category",pass:'Disclose <mark>absolute gross Scope 1, Scope 2 and Scope 3 emissions</mark> under the GHG Protocol, with Scope 3 broken down by category.',score:.81,crawled:"9d ago"},
+ {abbr:"M",stype:"ratings",c:"--ratings",org:"MSCI",ret:"dense 0.66",title:'Carbon Emissions Methodology — <mark>scope</mark> estimation',url:"msci.com/esg/methodology/carbon-emissions",sub:"How Scope 2 & 3 are modelled",pass:'<mark>Scope 2 is derived from purchased-energy consumption and grid factors</mark>; where unreported, <mark>Scope 3 is estimated via a sector input-output model</mark>.',score:.74,crawled:"16d ago"},
+ {abbr:"IS",stype:"report",c:"--report",org:"Illustrative Issuer plc",ret:"bm25 0.52",title:'Climate Transition Plan — our <mark>Scope 3</mark> footprint',url:"example-issuer.com/ctap-2025.pdf",sub:"Real-world example: S3 = 94% of total",pass:'"<mark>Scope 3 represents 94% of our total footprint</mark>, while our <mark>Scope 2 market-based emissions are near zero</mark>."',score:.69,crawled:"6d ago"}
+];
+const ENTITY=[
+ {abbr:"U",stype:"report",c:"--report",org:"ULVR · LSE",ret:"6 fields",title:"Unilever plc",sub:"net-zero 2030 · SBTi validated · MSCI AA",pass:'<mark>Net Zero across own operations by 2030</mark>, value chain by 2039 — SBTi-validated. Scope 3 = 60.8 MtCO₂e.',score:1,crawled:"cited",url:"unilever.com/ctap-2025.pdf"},
+ {abbr:"AZ",stype:"report",c:"--report",org:"AZN · LSE",ret:"6 fields",title:"AstraZeneca plc",sub:"net-zero 2030 · SBTi validated · MSCI AAA",pass:'<mark>Halve Scope 1–3 by 2030</mark>, net zero by 2045. SBTi-validated. No recent controversy found.',score:1,crawled:"cited",url:"astrazeneca.com/sustainability.pdf"},
+ {abbr:"NG",stype:"report",c:"--report",org:"NG · LSE",ret:"6 fields",title:"National Grid plc",sub:"net-zero 2050 · SBTi validated · grid outage inquiry",pass:'<mark>Net zero by 2050</mark>, 2034 near-term SBTi-validated. Recent: regulatory resilience inquiry.',score:1,crawled:"cited+est",url:"nationalgrid.com/rbr.pdf"},
+ {abbr:"DG",stype:"report",c:"--report",org:"DGE · LSE",ret:"6 fields",title:"Diageo plc",sub:"net-zero 2030 · SBTi committed · water complaint",pass:'<mark>Net zero across operations by 2030</mark>; SBTi submitted, pending validation.',score:1,crawled:"cited+est",url:"diageo.com/esg-index.pdf"},
+ {abbr:"TS",stype:"report",c:"--report",org:"TSCO · LSE",ret:"6 fields",title:"Tesco plc",sub:"net-zero 2035 · SBTi validated · supplier audit",pass:'<mark>Net zero in own operations by 2035</mark>, value chain 2050. SBTi-validated.',score:1,crawled:"cited+est",url:"tesco.com/sustainability.pdf"}
+];
+const COMMANDS=[
+ {ic:"⚙",t:"Open settings · BYOK keys",s:"manage Anthropic / OpenAI / OpenRouter / Ollama",act:"settings"},
+ {ic:"◆",t:"Switch to Quality tier",s:"hybrid + cross-encoder rerank",act:"quality"},
+ {ic:"⚡",t:"Switch to Fast tier",s:"dense-only · <200 ms",act:"fast"},
+ {ic:"⊞",t:"New entity search (Webset)",s:"build a cited table of companies",act:"entity"},
+ {ic:"↻",t:"Recrawl ESG corpus now",s:"incremental · changed chunks only",act:"none"},
+ {ic:"⭳",t:"Export last result as CSV",s:"6 rows · evidence columns included",act:"none"},
+ {ic:"◷",t:"Toggle live-search fallback",s:"merge Exa/Tavily for out-of-corpus queries",act:"none"}
+];
+const RECENT=[
+ {ic:"↩",t:"What is the difference between Scope 2 and Scope 3 emissions?",s:"search · 6 results · just now",act:"search"},
+ {ic:"↩",t:"companies walking back climate commitments",s:"semantic search · 12 results · 1h ago",act:"none"},
+ {ic:"↩",t:"FTSE 100 · 2030 net-zero + SBTi validated",s:"entity search · 6 rows · 2h ago",act:"entity"},
+ {ic:"↩",t:"CSRD double-materiality explained",s:"search · 9 results · yesterday",act:"none"}
+];
+
+const reslist=document.getElementById('reslist'),peek=document.getElementById('peek');
+let mode='search',idx=0,tier='fast';
+const MODES={search:SEARCH,entity:ENTITY,commands:COMMANDS,recent:RECENT};
+const GROUP={search:"passages · local ESG index",entity:"entities · cited extraction",commands:"actions",recent:"history"};
+const CRUMB={search:"Search",entity:"Entity",commands:"Commands",recent:"Recent"};
+
+function isResult(){return mode==='search'||mode==='entity'}
+function render(){
+  const list=MODES[mode];
+  reslist.innerHTML=`<div class="group">${list.length} ${GROUP[mode]}</div>`+list.map((d,i)=>{
+    if(isResult()) return `<div class="row ${i===idx?'sel':''}" data-i="${i}"><div class="ico" style="background:var(${d.c})">${d.abbr}</div><div class="main"><div class="t">${d.title}</div><div class="s">${d.org} · ${d.sub}</div></div><div class="meta"><span class="stype" style="color:var(${d.c});background:${tint(d.c,14)}">${d.stype}</span><span class="ret">${mode==='search'&&tier==='quality'?'rerank '+d.score.toFixed(2):d.ret}</span></div></div>`;
+    return `<div class="row ${i===idx?'sel':''}" data-i="${i}"><div class="ico cmd">${d.ic}</div><div class="main"><div class="t">${d.t}</div><div class="s">${d.s}</div></div><div class="meta"><span class="kbdhint">↵</span></div></div>`;
+  }).join('');
+  reslist.querySelectorAll('.row').forEach(el=>{el.onmouseenter=()=>{idx=+el.dataset.i;select()};el.onclick=()=>{idx=+el.dataset.i;activate()}});
+  document.getElementById('crumb').textContent=CRUMB[mode];
+  document.getElementById('hint').textContent=mode==='search'?`6 passages · ${tier==='fast'?'dense-only':'hybrid + rerank'} · local index`:mode==='entity'?'5 entities · evidence-or-null':mode==='commands'?'⌘K actions':'recent activity';
+  select();
+}
+function select(){
+  reslist.querySelectorAll('.row').forEach((r,i)=>r.classList.toggle('sel',i===idx));
+  const list=MODES[mode],d=list[idx];if(!d)return;
+  if(isResult()){
+    peek.innerHTML=`<span class="ptype" style="color:var(${d.c});background:${tint(d.c,14)}">${d.stype} · ${d.org}</span><div class="ph">${d.title.replace(/<\/?mark>/g,'')}</div><div class="pu">${d.url}</div><div class="pass">${d.pass}</div><div class="pmeta"><div class="r"><span>${mode==='entity'?'evidence':'match score'}</span><b>${mode==='entity'?d.crawled:d.score.toFixed(2)}</b></div><div class="r"><span>${mode==='entity'?'fields filled':'retrieved by'}</span><b>${mode==='entity'?d.ret:(tier==='fast'?d.ret:'hybrid + rerank')}</b></div><div class="r"><span>${mode==='entity'?'identifier':'crawled'}</span><b>${mode==='entity'?d.org:d.crawled}</b></div></div>`;
+  } else {
+    peek.innerHTML=`<span class="ptype" style="color:var(--accent);background:var(--accent-soft)">command</span><div class="ph">${d.t}</div><div class="pass" style="margin-top:8px">${d.s}.</div><div class="pmeta"><div class="r"><span>press</span><b>↵ to run</b></div></div>`;
+  }
+  const sel=reslist.querySelector('.row.sel');if(sel)sel.scrollIntoView({block:'nearest'});
+}
+function activate(){
+  const d=MODES[mode][idx];if(!d)return;const act=d.act;
+  if(act==='settings')openSheet();
+  else if(act==='quality'||act==='fast'){tier=act;document.querySelectorAll('.seg button').forEach(x=>x.classList.toggle('on',x.dataset.t===tier));setMode('search')}
+  else if(act==='search'){setMode('search')}
+  else if(act==='entity'){setMode('entity')}
+}
+function setMode(m){mode=m;idx=0;document.querySelectorAll('.modes button').forEach(x=>x.classList.toggle('on',x.dataset.mode===m));render()}
+document.querySelectorAll('.modes button').forEach(b=>b.onclick=()=>setMode(b.dataset.mode));
+document.querySelectorAll('.seg button').forEach(b=>b.onclick=()=>{document.querySelectorAll('.seg button').forEach(x=>x.classList.remove('on'));b.classList.add('on');tier=b.dataset.t;render()});
+
+document.addEventListener('keydown',e=>{
+  if(e.key==='ArrowDown'){idx=Math.min(MODES[mode].length-1,idx+1);select();e.preventDefault()}
+  else if(e.key==='ArrowUp'){idx=Math.max(0,idx-1);select();e.preventDefault()}
+  else if(e.key==='Enter'){activate()}
+  else if(e.key==='Tab'){const order=['search','entity','commands','recent'];setMode(order[(order.indexOf(mode)+1)%4]);e.preventDefault()}
+  else if(['1','2','3','4'].includes(e.key)&&document.activeElement.id!=='q'){setMode(['search','entity','commands','recent'][+e.key-1])}
+  else if((e.metaKey||e.ctrlKey)&&e.key.toLowerCase()==='k'){setMode('commands');e.preventDefault()}
+  else if(e.key==='Escape'){closeSheet()}
+});
+
+/* settings sheet */
+const PROV=[["Anthropic","A","--news",true,"claude-opus-4-8","sk-ant-•••••••3xQ"],["OpenAI","O","--report",false,"gpt-5",""],["OpenRouter","R","--regulator",false,"any model",""],["Ollama","L","--framework",true,"local · no key","localhost:11434"]];
+document.getElementById('prov').innerHTML=PROV.map(p=>`<div class="pcard ${p[3]?'active':''}"><div class="ph"><div class="pi" style="background:var(${p[2]})">${p[1]}</div><div class="pn">${p[0]}<small>${p[4]}</small></div></div>${p[0]==='Ollama'?`<div class="keystate">● connected · ${p[5]}</div>`:`<input class="key" value="${p[5]}" ${p[5]?'':'placeholder="paste API key…"'}><div class="keystate ${p[3]?'':'empty'}">${p[3]?'● saved to Keychain':'○ no key stored'}</div>`}</div>`).join('');
+const sheet=document.getElementById('sheet');
+function openSheet(){sheet.classList.add('on')}function closeSheet(){sheet.classList.remove('on')}
+document.getElementById('sheetx').onclick=closeSheet;document.getElementById('sheetbg').onclick=closeSheet;
+
+render();
+</script>
+</body>
+</html>

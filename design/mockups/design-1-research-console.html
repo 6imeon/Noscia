@@ -1,0 +1,356 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Noscia · 01 Research Console</title>
+<style>
+  :root{
+    /* PALETTE: warm espresso + terracotta */
+    --bg:#201b16;--panel:#29231c;--panel-2:#241e18;--rail:#1b1611;--field:#181410;
+    --line:#3a3127;--line-2:#2a231c;--hover:#2c2419;--sel:#322617;
+    --ink:#ece4d6;--muted:#a89a86;--dim:#776b5a;
+    --accent:#cc8a5c;--accent-2:#b9764a;--accent-soft:rgba(204,138,92,.14);
+    --mark:rgba(204,138,92,.22);--mark-line:rgba(204,138,92,.6);--mark-ink:#f6ecdf;
+    --framework:#8b97a3;--regulator:#a08a9b;--ratings:#c2a368;--report:#92a07c;--news:#bd8a76;--ngo:#7f9173;
+    --ok:#92a07c;--warn:#c2a368;
+    --sans:-apple-system,BlinkMacSystemFont,"Segoe UI",Inter,Roboto,Helvetica,Arial,sans-serif;
+    --mono:"SF Mono",ui-monospace,"JetBrains Mono",Menlo,Consolas,monospace;
+  }
+  *{box-sizing:border-box}
+  html,body{height:100%}
+  body{margin:0;background:var(--bg);color:var(--ink);font-family:var(--sans);-webkit-font-smoothing:antialiased;display:flex;flex-direction:column;height:100vh;overflow:hidden;}
+  ::-webkit-scrollbar{width:10px;height:10px}::-webkit-scrollbar-thumb{background:#473b2d;border-radius:6px;border:2px solid var(--bg)}
+
+  .switch{display:flex;align-items:center;gap:4px;height:38px;padding:0 12px;background:#150f0b;border-bottom:1px solid var(--line-2);flex-shrink:0;}
+  .switch .tag{font-family:var(--mono);font-size:10px;color:var(--dim);margin-right:6px;letter-spacing:.1em}
+  .switch a{text-decoration:none;color:var(--dim);font-size:11.5px;font-family:var(--mono);padding:4px 9px;border-radius:6px;}
+  .switch a:hover{color:var(--ink);background:#221a13}
+  .switch a.on{color:var(--accent);background:var(--accent-soft)}
+  .switch .home{margin-left:auto}
+
+  .app{flex:1;display:grid;grid-template-columns:62px 1fr;min-height:0;}
+  /* sidebar */
+  .side{background:var(--rail);border-right:1px solid var(--line);display:flex;flex-direction:column;align-items:center;padding:12px 0;gap:4px;}
+  .logo{width:34px;height:34px;border-radius:9px;background:linear-gradient(135deg,var(--accent),var(--accent-2));display:grid;place-items:center;font-weight:800;color:#2a1a0e;font-size:17px;margin-bottom:12px;}
+  .nav{width:44px;height:44px;border-radius:11px;display:grid;place-items:center;color:var(--dim);cursor:pointer;position:relative;}
+  .nav:hover{background:var(--hover);color:var(--ink)}
+  .nav.on{background:var(--accent-soft);color:var(--accent)}
+  .nav svg{width:20px;height:20px}
+  .nav .lab{position:absolute;left:52px;background:#0f0b08;border:1px solid var(--line);color:var(--ink);font-size:12px;padding:4px 9px;border-radius:7px;white-space:nowrap;opacity:0;visibility:hidden;transition:.12s;font-family:var(--mono);z-index:20;pointer-events:none}
+  .nav:hover .lab{opacity:1;visibility:visible}
+  .side .spacer{flex:1}
+  .side .idx{writing-mode:vertical-rl;font-family:var(--mono);font-size:9px;color:var(--dim);letter-spacing:.1em;margin-bottom:6px}
+
+  .stage{min-height:0;overflow:hidden;display:flex;flex-direction:column}
+  .view{display:none;flex:1;min-height:0;}
+  .view.on{display:flex;flex-direction:column}
+
+  /* top search bar (shared) */
+  .bar{display:flex;align-items:center;gap:12px;padding:13px 20px;border-bottom:1px solid var(--line);flex-shrink:0;background:linear-gradient(180deg,#29231c,#241e18);}
+  .qbox{flex:1;display:flex;align-items:center;gap:10px;background:var(--field);border:1px solid var(--line);border-radius:11px;padding:11px 14px;}
+  .qbox:focus-within{border-color:var(--accent);box-shadow:0 0 0 3px var(--accent-soft);}
+  .qbox svg{flex-shrink:0;color:var(--muted)}
+  .qbox input{flex:1;background:none;border:none;outline:none;color:var(--ink);font-size:15px;font-family:var(--sans);}
+  .tier{display:flex;background:var(--field);border:1px solid var(--line);border-radius:9px;padding:3px;gap:2px;}
+  .tier button{background:none;border:none;color:var(--muted);font-family:var(--mono);font-size:12px;padding:6px 12px;border-radius:6px;cursor:pointer;display:flex;align-items:center;gap:6px;}
+  .tier button.on{background:var(--accent);color:#2a1a0e;font-weight:700;}
+  .tier .dot{width:5px;height:5px;border-radius:50%;background:currentColor;opacity:.7}
+
+  /* SEARCH split */
+  .split{display:grid;grid-template-columns:minmax(400px,1fr) 1.2fr;flex:1;min-height:0;}
+  .list{border-right:1px solid var(--line);overflow-y:auto;padding:8px 0 40px;}
+  .reader{overflow-y:auto;background:var(--panel-2);}
+  .rhead{display:flex;align-items:center;justify-content:space-between;padding:10px 18px 8px;color:var(--dim);font-family:var(--mono);font-size:11px;}
+  .pipe b{color:var(--muted);font-weight:500}
+  .res{padding:13px 18px;border-left:2px solid transparent;cursor:pointer;border-bottom:1px solid var(--line-2);}
+  .res:hover{background:var(--hover)} .res.sel{background:var(--sel);border-left-color:var(--accent)}
+  .res-top{display:flex;align-items:center;gap:8px;margin-bottom:6px}
+  .stype{font-family:var(--mono);font-size:10px;text-transform:uppercase;letter-spacing:.07em;padding:2px 7px;border-radius:5px;border:1px solid}
+  .rank{font-family:var(--mono);font-size:11px;color:var(--dim)}
+  .score{margin-left:auto;display:flex;align-items:center;gap:7px;font-family:var(--mono);font-size:11px;color:var(--muted)}
+  .sbar{width:42px;height:4px;border-radius:2px;background:#473b2d;overflow:hidden}.sbar i{display:block;height:100%;background:linear-gradient(90deg,var(--accent-2),var(--accent))}
+  .res h3{font-size:14px;margin:0 0 3px;font-weight:620;line-height:1.3}
+  .url{font-family:var(--mono);font-size:11px;color:var(--dim);margin-bottom:7px}.url .fresh{color:var(--ngo)}
+  .snippet{font-size:12.5px;color:#ccbda8;line-height:1.5}
+  .snippet mark{background:var(--mark);color:var(--mark-ink);border-bottom:1px solid var(--mark-line);border-radius:2px;padding:0 1px}
+
+  .reader-inner{padding:28px 34px 80px;max-width:740px}
+  .reader-empty{height:100%;display:grid;place-items:center;color:var(--dim);font-family:var(--mono);font-size:13px}
+  .r-stype{display:inline-flex;gap:7px;font-family:var(--mono);font-size:11px;text-transform:uppercase;letter-spacing:.07em;padding:3px 9px;border-radius:6px;border:1px solid}
+  .r-title{font-size:24px;font-weight:720;letter-spacing:-.02em;margin:14px 0 6px;line-height:1.2}
+  .r-url{font-family:var(--mono);font-size:12px;color:var(--accent);word-break:break-all}
+  .r-meta{display:flex;gap:18px;flex-wrap:wrap;margin:18px 0;padding:14px 0;border-top:1px solid var(--line);border-bottom:1px solid var(--line);font-family:var(--mono);font-size:12px;color:var(--muted)}
+  .r-meta b{display:block;color:var(--ink);font-size:13px;margin-top:3px;font-family:var(--sans);font-weight:600}
+  .r-section{font-family:var(--mono);font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:var(--dim);margin:24px 0 12px}
+  .passage{font-size:15px;line-height:1.72;color:#ddd0bf}.passage p{margin:0 0 16px}.ctx{opacity:.5}
+  .passage mark{background:var(--mark);color:var(--mark-ink);box-shadow:inset 0 -2px 0 var(--mark-line);border-radius:2px;padding:1px 2px}
+  .scope-tabs{display:flex;gap:6px;margin:16px 0 2px}
+  .scope-tabs button{font-family:var(--mono);font-size:11px;color:var(--muted);background:var(--panel);border:1px solid var(--line);border-radius:7px;padding:6px 11px;cursor:pointer}
+  .scope-tabs button.on{color:var(--accent);border-color:var(--accent)}
+  .actions{display:flex;gap:10px;margin-top:28px}
+  .btn{font-family:var(--mono);font-size:12px;padding:9px 14px;border-radius:9px;border:1px solid var(--line);background:var(--panel);color:var(--ink);cursor:pointer;display:inline-flex;gap:7px;align-items:center}
+  .btn:hover{border-color:var(--accent);color:var(--accent)}
+  .btn.primary{background:var(--accent);color:#2a1a0e;border-color:var(--accent);font-weight:700}
+
+  /* generic page scaffolding for corpus/entity/settings */
+  .page{overflow-y:auto;flex:1;padding:26px 34px 80px}
+  .page h1{font-size:22px;font-weight:730;letter-spacing:-.02em;margin:0 0 4px}
+  .page .sub{color:var(--muted);font-size:13.5px;margin-bottom:24px}
+  .cards{display:grid;grid-template-columns:repeat(auto-fill,minmax(170px,1fr));gap:14px;margin-bottom:26px}
+  .stat{background:var(--panel);border:1px solid var(--line);border-radius:13px;padding:16px}
+  .stat .k{font-family:var(--mono);font-size:10.5px;text-transform:uppercase;letter-spacing:.06em;color:var(--dim)}
+  .stat .v{font-size:26px;font-weight:740;margin-top:7px;letter-spacing:-.02em}
+  .stat .d{font-family:var(--mono);font-size:11px;color:var(--muted);margin-top:5px}
+  .stat .d.up{color:var(--ok)}
+
+  table.grid{border-collapse:separate;border-spacing:0;width:100%;font-size:13px;background:var(--panel);border:1px solid var(--line);border-radius:13px;overflow:hidden}
+  table.grid th{text-align:left;font-family:var(--mono);font-size:10px;letter-spacing:.05em;text-transform:uppercase;color:var(--dim);font-weight:500;padding:12px 14px;border-bottom:1px solid var(--line);background:var(--panel-2)}
+  table.grid td{padding:12px 14px;border-bottom:1px solid var(--line-2)}
+  table.grid tr:last-child td{border-bottom:none}
+  table.grid tr.clk{cursor:pointer}.grid tr.clk:hover td{background:var(--hover)}
+  .dot{width:8px;height:8px;border-radius:50%;display:inline-block;margin-right:7px;vertical-align:middle}
+  .barbtn{font-family:var(--mono);font-size:10.5px;color:var(--accent);border:1px solid var(--line);background:none;border-radius:6px;padding:4px 9px;cursor:pointer}
+  .barbtn:hover{border-color:var(--accent);background:var(--accent-soft)}
+  .progress{height:6px;border-radius:3px;background:var(--field);overflow:hidden;width:120px}.progress i{display:block;height:100%;background:linear-gradient(90deg,var(--accent-2),var(--accent))}
+  .seedadd{display:flex;gap:10px;margin-top:18px}
+  .seedadd input{flex:1;background:var(--field);border:1px solid var(--line);border-radius:10px;padding:10px 13px;color:var(--ink);outline:none;font-family:var(--mono);font-size:12.5px}
+  .seedadd input:focus{border-color:var(--accent)}
+
+  /* settings */
+  .prov{display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:14px}
+  .pcard{background:var(--panel);border:1px solid var(--line);border-radius:13px;padding:16px}
+  .pcard.active{border-color:var(--accent)}
+  .pcard .ph{display:flex;align-items:center;gap:10px;margin-bottom:12px}
+  .pcard .pi{width:30px;height:30px;border-radius:8px;display:grid;place-items:center;font-weight:800;font-family:var(--mono);font-size:13px;color:#2a1a0e}
+  .pcard .pn{font-weight:650} .pcard .pn small{display:block;font-family:var(--mono);font-size:10.5px;color:var(--dim);font-weight:400}
+  .pcard .keyrow{display:flex;gap:8px;align-items:center}
+  .pcard input.key{flex:1;background:var(--field);border:1px solid var(--line);border-radius:8px;padding:9px 11px;color:var(--ink);font-family:var(--mono);font-size:12px;outline:none}
+  .pcard input.key:focus{border-color:var(--accent)}
+  .chiprow{display:flex;gap:7px;flex-wrap:wrap;margin-top:11px}
+  .chip{font-family:var(--mono);font-size:11px;border:1px solid var(--line);border-radius:999px;padding:4px 10px;color:var(--muted);cursor:pointer}
+  .chip.on{color:var(--accent);border-color:var(--accent);background:var(--accent-soft)}
+  .keystate{font-family:var(--mono);font-size:10.5px;color:var(--ok);display:flex;align-items:center;gap:6px;margin-top:10px}
+  .keystate.empty{color:var(--dim)}
+  .note{background:var(--panel-2);border:1px solid var(--line);border-left:3px solid var(--warn);border-radius:10px;padding:13px 15px;font-size:12.5px;color:var(--muted);line-height:1.55;margin-top:22px}
+  .note b{color:var(--ink)}
+  .setsec{margin:26px 0 12px;font-family:var(--mono);font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:var(--dim)}
+  .toprow{display:flex;align-items:center;gap:14px;margin-bottom:22px}
+  .toprow .btn{margin-left:auto}
+</style>
+</head>
+<body>
+  <nav class="switch">
+    <span class="tag">NOSCIA · DESIGN</span>
+    <a class="on" href="design-1-research-console.html">01 Console</a>
+    <a href="design-2-evidence-cards.html">02 Cards</a>
+    <a href="design-3-entity-workbench.html">03 Workbench</a>
+    <a href="design-4-provenance-inspector.html">04 Provenance</a>
+    <a href="design-5-command-palette.html">05 Palette</a>
+    <a class="home" href="index.html">↩ gallery</a>
+  </nav>
+
+  <div class="app">
+    <aside class="side">
+      <div class="logo">N</div>
+      <div class="nav on" data-view="search"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></svg><span class="lab">Search</span></div>
+      <div class="nav" data-view="entity"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18M3 15h18M9 3v18"/></svg><span class="lab">Entity search</span></div>
+      <div class="nav" data-view="corpus"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M3 5v14c0 1.7 4 3 9 3s9-1.3 9-3V5M3 12c0 1.7 4 3 9 3s9-1.3 9-3"/></svg><span class="lab">Corpus &amp; index</span></div>
+      <div class="spacer"></div>
+      <div class="nav" data-view="settings"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-2.82 1.17V21a2 2 0 1 1-4 0v-.09A1.65 1.65 0 0 0 8 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.6 14H4.5a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 6 8.6a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 10 4.6h.09A1.65 1.65 0 0 0 12 3a2 2 0 1 1 4 0v.09A1.65 1.65 0 0 0 19.4 8.6"/></svg><span class="lab">Settings · BYOK</span></div>
+      <div class="idx">idx 4,182</div>
+    </aside>
+
+    <div class="stage">
+      <!-- ============ SEARCH ============ -->
+      <section class="view on" id="view-search">
+        <div class="bar">
+          <div class="qbox">
+            <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></svg>
+            <input value="What is the difference between Scope 2 and Scope 3 emissions?" spellcheck="false">
+          </div>
+          <div class="tier"><button class="on" data-tier="quality"><span class="dot"></span>Quality</button><button data-tier="fast"><span class="dot"></span>Fast</button></div>
+        </div>
+        <div class="split">
+          <div class="list">
+            <div class="rhead"><span id="rcount">6 passages · quality tier</span><span class="pipe">dense <b>112</b>+bm25 <b>98</b> → rrf → rerank <b>50</b></span></div>
+            <div id="results"></div>
+          </div>
+          <div class="reader"><div id="reader" class="reader-empty">select a result to read the passage in context →</div></div>
+        </div>
+      </section>
+
+      <!-- ============ ENTITY ============ -->
+      <section class="view" id="view-entity">
+        <div class="bar">
+          <div class="qbox">
+            <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M4 6h16M4 12h16M4 18h10"/></svg>
+            <input value="FTSE 100 companies with a 2030 net-zero target and SBTi-validated pathway" spellcheck="false">
+          </div>
+          <button class="btn primary">Run extraction →</button>
+        </div>
+        <div class="page">
+          <div class="toprow">
+            <div><h1 style="font-size:18px;margin:0">Extraction result</h1><div class="sub" style="margin:2px 0 0">6 entities · evidence-or-null · click a row to open its cited passages in the reader</div></div>
+            <button class="btn">⭳ CSV</button><button class="btn">⭳ JSON</button>
+          </div>
+          <table class="grid" id="entgrid"></table>
+          <div class="note">This is the lightweight entity view inside the console. The full faceted spreadsheet with per-cell evidence drawers lives in <b><a href="design-3-entity-workbench.html" style="color:var(--accent)">03 · Workbench</a></b>.</div>
+        </div>
+      </section>
+
+      <!-- ============ CORPUS ============ -->
+      <section class="view" id="view-corpus">
+        <div class="page">
+          <h1>Corpus &amp; index</h1>
+          <div class="sub">Local LanceDB index · everything on this machine. Last full crawl 2 days ago.</div>
+          <div class="cards">
+            <div class="stat"><div class="k">Chunks indexed</div><div class="v">4,182</div><div class="d up">+118 this week</div></div>
+            <div class="stat"><div class="k">Source pages</div><div class="v">1,204</div><div class="d">across 6 types</div></div>
+            <div class="stat"><div class="k">Index size</div><div class="v">312 MB</div><div class="d">dense 256-d + BM25</div></div>
+            <div class="stat"><div class="k">Embedding</div><div class="v" style="font-size:15px;line-height:1.5;padding-top:6px">Qwen3-0.6B<br><span style="font-size:11px;color:var(--muted);font-family:var(--mono)">256-d · matryoshka</span></div></div>
+          </div>
+          <div class="setsec">Sources · recrawl status</div>
+          <table class="grid" id="srcgrid"></table>
+          <div class="seedadd">
+            <input placeholder="add seed URL  e.g. https://www.ifrs.org/issb/  (type → report → monthly)">
+            <button class="btn primary">＋ Add &amp; crawl</button>
+          </div>
+        </div>
+      </section>
+
+      <!-- ============ SETTINGS ============ -->
+      <section class="view" id="view-settings">
+        <div class="page">
+          <h1>Settings · bring your own key</h1>
+          <div class="sub">Keys are stored in the macOS Keychain via <code style="font-family:var(--mono);color:var(--ink)">keyring</code> and read per call — never written to disk. Plain search runs locally with no key.</div>
+          <div class="setsec">LLM providers</div>
+          <div class="prov" id="prov"></div>
+          <div class="setsec">Defaults</div>
+          <div class="prov">
+            <div class="pcard"><div class="pn" style="margin-bottom:10px">Default reasoning model</div>
+              <div class="chiprow"><span class="chip on">claude-opus-4-8</span><span class="chip">gpt-5</span><span class="chip">llama-4-70b (ollama)</span></div></div>
+            <div class="pcard"><div class="pn" style="margin-bottom:10px">Default search tier</div>
+              <div class="chiprow"><span class="chip on">Quality (hybrid+rerank)</span><span class="chip">Fast (dense only)</span></div></div>
+          </div>
+          <div class="note">⚠ <b>Dependency cooldown active.</b> pnpm <code style="font-family:var(--mono);color:var(--ink)">minimumReleaseAge: 10080</code> (7 days) + Renovate parity for PyPI. New releases are quarantined for a week before they can install — supply-chain defense.</div>
+        </div>
+      </section>
+    </div>
+  </div>
+
+<script>
+const tint=(c,a)=>`color-mix(in srgb, var(${c}) ${a}%, transparent)`;
+/* ---------- view router ---------- */
+document.querySelectorAll('.nav').forEach(n=>n.onclick=()=>{
+  document.querySelectorAll('.nav').forEach(x=>x.classList.remove('on'));
+  n.classList.add('on');
+  const v=n.dataset.view;
+  document.querySelectorAll('.view').forEach(s=>s.classList.toggle('on',s.id==='view-'+v));
+});
+
+/* ---------- search data ---------- */
+const DATA=[
+ {stype:"framework",color:"--framework",rank:1,score:.97,title:"Scope 2 Guidance — Emissions from Purchased Energy",org:"GHG Protocol",url:"ghgprotocol.org/scope-2-guidance",crawled:"crawled 4 days ago",fresh:true,
+  snippet:"Scope 2 covers <mark>indirect emissions from purchased electricity, steam, heat or cooling</mark>; <mark>Scope 3 captures all other indirect value-chain emissions</mark>.",
+  passage:[{ctx:1,t:"The GHG Protocol organises emissions into three scopes to avoid double counting across organisations."},{t:"<mark>Scope 2 accounts for indirect GHG emissions from the generation of purchased electricity, steam, heat or cooling</mark> consumed by the company."},{t:"<mark>Scope 3 includes all other indirect emissions in the value chain</mark>, both upstream and downstream, and is frequently the largest share of the footprint."},{ctx:1,t:"The distinction is one of proximity: Scope 2 is purchased energy; Scope 3 is the broad remainder."}]},
+ {stype:"framework",color:"--framework",rank:2,score:.92,title:"GRI 305: Emissions 2016 — Disclosure 305-3",org:"GRI",url:"globalreporting.org/standards/gri-305",crawled:"crawled 11 days ago",fresh:false,
+  snippet:"Under GRI 305, <mark>Scope 2 is reported separately from Scope 3</mark>; 305-3 covers <mark>other indirect (Scope 3) emissions</mark>.",
+  passage:[{ctx:1,t:"GRI 305 sets reporting requirements across the three scopes."},{t:"305-2 addresses energy indirect (Scope 2); <mark>305-3 addresses other indirect (Scope 3) emissions</mark>, reported separately."},{t:"Scope 3 emissions <mark>arise from sources the organisation does not own or control</mark> and are often the most significant portion of the total."}]},
+ {stype:"ngo",color:"--ngo",rank:3,score:.86,title:"Technical Note: Relevance of Scope 3",org:"CDP",url:"cdp.net/guidance/scope-3-technical-note",crawled:"crawled 2 days ago",fresh:true,
+  snippet:"CDP finds <mark>Scope 3 is on average 11× larger than Scope 1 and 2 combined</mark> for disclosing companies.",
+  passage:[{ctx:1,t:"Why CDP requests value-chain data alongside operational emissions."},{t:"<mark>Scope 3 emissions are, on average, more than 11 times greater than combined Scope 1 and Scope 2</mark>. A target omitting Scope 3 typically excludes the majority of impact."}]},
+ {stype:"regulator",color:"--regulator",rank:4,score:.81,title:"IFRS S2 Climate-related Disclosures",org:"ISSB / IFRS",url:"ifrs.org/issb/ifrs-s2/ghg-emissions",crawled:"crawled 9 days ago",fresh:false,
+  snippet:"IFRS S2 requires <mark>absolute gross Scope 1, 2 and 3 emissions</mark>, with Scope 3 by category.",
+  passage:[{ctx:1,t:"IFRS S2 establishes climate disclosure for financial reporting."},{t:"Disclose <mark>absolute gross Scope 1, Scope 2 and Scope 3 emissions</mark> under the GHG Protocol, with <mark>Scope 3 broken into categories</mark>."}]},
+ {stype:"ratings",color:"--ratings",rank:5,score:.74,title:"Carbon Emissions Methodology",org:"MSCI ESG",url:"msci.com/esg/methodology/carbon-emissions",crawled:"crawled 16 days ago",fresh:false,
+  snippet:"MSCI <mark>estimates Scope 3 via input-output models</mark>; Scope 2 from disclosed energy + grid factors.",
+  passage:[{ctx:1,t:"How emissions inputs are sourced and modelled for ratings."},{t:"<mark>Scope 2 is calculated from purchased-energy consumption × grid factors</mark>; <mark>Scope 3 is estimated using a sector input-output model</mark> when disclosure is unavailable."}]},
+ {stype:"report",color:"--report",rank:6,score:.69,title:"Climate Transition Action Plan 2025",org:"Illustrative Issuer plc",url:"example-issuer.com/ctap-2025.pdf",crawled:"crawled 6 days ago",fresh:true,
+  snippet:"\"<mark>Scope 3 represents 94% of our footprint</mark>; <mark>Scope 2 market-based is near zero</mark>.\"",
+  passage:[{ctx:1,t:"Extract from a company disclosure (illustrative data)."},{t:"Our <mark>market-based Scope 2 emissions have fallen to near zero</mark> following renewable contracts."},{t:"<mark>Scope 3 represents approximately 94% of our total footprint</mark>, in purchased goods and use of sold products."}]}
+];
+const results=document.getElementById('results'), reader=document.getElementById('reader');
+let tier='quality';
+function renderList(){
+  const list=tier==='fast'?DATA.slice().sort((a,b)=>b.score-a.score):DATA;
+  results.innerHTML=list.map((d,i)=>`<div class="res" data-i="${DATA.indexOf(d)}">
+    <div class="res-top"><span class="rank">#${i+1}</span>
+      <span class="stype" style="color:var(${d.color});border-color:${tint(d.color,35)};background:${tint(d.color,10)}">${d.stype}</span>
+      <span class="score"><span class="sbar"><i style="width:${Math.round(d.score*100)}%"></i></span>${d.score.toFixed(2)}</span></div>
+    <h3>${d.title}</h3><div class="url">${d.org} · ${d.url}${d.fresh?' · <span class="fresh">● fresh</span>':''}</div>
+    <div class="snippet">${d.snippet}</div></div>`).join('');
+  results.querySelectorAll('.res').forEach(el=>el.onclick=()=>select(+el.dataset.i,el));
+}
+function select(i,el){
+  results.querySelectorAll('.res').forEach(r=>r.classList.remove('sel')); if(el)el.classList.add('sel');
+  const d=DATA[i]; reader.className='';
+  reader.innerHTML=`<div class="reader-inner">
+    <span class="r-stype" style="color:var(${d.color});border-color:${tint(d.color,40)};background:${tint(d.color,10)}">● ${d.stype} · ${d.org}</span>
+    <div class="r-title">${d.title}</div><a class="r-url">${d.url}</a>
+    <div class="r-meta"><div>SOURCE TYPE<b>${d.stype}</b></div><div>RERANK SCORE<b>${d.score.toFixed(3)}</b></div><div>FRESHNESS<b>${d.crawled}</b></div><div>RANK<b>#${d.rank} of 6</b></div></div>
+    <div class="scope-tabs"><button class="on" data-m="highlight">Highlighted passage</button><button data-m="full">Full context</button></div>
+    <div class="r-section">best-matching passage for your query</div><div class="passage" id="passage"></div>
+    <div class="actions"><button class="btn primary">＋ Add to entity table</button><button class="btn">⧉ Open source</button><button class="btn">⌘C Cite</button></div></div>`;
+  let mode='highlight';const passage=reader.querySelector('#passage');
+  const paint=()=>passage.innerHTML=d.passage.filter(p=>mode==='full'||!p.ctx||/<mark>/.test(p.t)).map(p=>`<p class="${p.ctx?'ctx':''}">${p.t}</p>`).join('');
+  paint();
+  reader.querySelectorAll('.scope-tabs button').forEach(b=>b.onclick=()=>{reader.querySelectorAll('.scope-tabs button').forEach(x=>x.classList.remove('on'));b.classList.add('on');mode=b.dataset.m;paint();});
+}
+document.querySelectorAll('.tier button').forEach(b=>b.onclick=()=>{
+  document.querySelectorAll('.tier button').forEach(x=>x.classList.remove('on'));b.classList.add('on');tier=b.dataset.tier;
+  document.getElementById('rcount').textContent=`6 passages · ${tier} tier`;
+  document.querySelector('.pipe').style.opacity=tier==='fast'?.35:1; renderList();
+});
+renderList(); select(0,results.querySelector('.res'));
+
+/* ---------- entity grid ---------- */
+const ENT=[
+ ["Unilever plc","2030","Validated","AA","Plastics pledge scaled back","--report"],
+ ["AstraZeneca plc","2030","Validated","AAA","—","--report"],
+ ["National Grid plc","2050","Validated","A","Grid outage inquiry","--report"],
+ ["Diageo plc","2030","Committed","AA","Water-use complaint","--report"],
+ ["GSK plc","2030","Validated","AA","—","--report"],
+ ["Tesco plc","2035","Validated","A","Supplier labour audit","--report"]];
+document.getElementById('entgrid').innerHTML=
+ `<thead><tr><th>Company</th><th>Net-zero yr</th><th>SBTi</th><th>ESG rating</th><th>Recent controversy</th></tr></thead><tbody>`+
+ ENT.map(r=>`<tr class="clk" onclick="document.querySelector('.nav[data-view=search]').click()">
+   <td style="font-weight:640">${r[0]}</td><td>${r[1]}</td>
+   <td><span style="font-family:var(--mono);font-size:11px;color:${r[2]=='Validated'?'var(--ok)':'var(--warn)'}">${r[2]}</span></td>
+   <td><span style="font-family:var(--mono);font-weight:700;color:var(--ratings)">${r[3]}</span></td>
+   <td style="color:${r[4]=='—'?'var(--dim)':'var(--news)'}">${r[4]}</td></tr>`).join('')+`</tbody>`;
+
+/* ---------- corpus sources ---------- */
+const SRC=[
+ ["GHG Protocol","framework","--framework",214,"4d ago","monthly",100,"idle"],
+ ["GRI Standards","framework","--framework",186,"11d ago","monthly",100,"idle"],
+ ["ISSB / IFRS","regulator","--regulator",97,"9d ago","monthly",100,"idle"],
+ ["CDP","ngo","--ngo",142,"2d ago","weekly",62,"crawling"],
+ ["MSCI methodology","ratings","--ratings",73,"16d ago","monthly",100,"idle"],
+ ["Company reports (demo set)","report","--report",402,"6d ago","quarterly",100,"idle"],
+ ["ESG news wire","news","--news",90,"3h ago","hourly",100,"idle"]];
+document.getElementById('srcgrid').innerHTML=
+ `<thead><tr><th>Source</th><th>Type</th><th>Pages</th><th>Last crawl</th><th>Cadence</th><th>Status</th><th></th></tr></thead><tbody>`+
+ SRC.map(s=>`<tr><td style="font-weight:600">${s[0]}</td>
+  <td><span class="dot" style="background:var(${s[2]})"></span><span style="font-family:var(--mono);font-size:11px;color:var(${s[2]})">${s[1]}</span></td>
+  <td style="font-family:var(--mono)">${s[3]}</td><td style="font-family:var(--mono);font-size:12px;color:var(--muted)">${s[4]}</td>
+  <td style="font-family:var(--mono);font-size:12px;color:var(--muted)">${s[5]}</td>
+  <td>${s[7]==='crawling'?`<div class="progress"><i style="width:${s[6]}%"></i></div>`:`<span style="font-family:var(--mono);font-size:11px;color:var(--dim)">● idle</span>`}</td>
+  <td style="text-align:right"><button class="barbtn">recrawl</button></td></tr>`).join('')+`</tbody>`;
+
+/* ---------- providers ---------- */
+const PROV=[
+ ["Anthropic","A","--news",true,"claude-opus-4-8 · default","sk-ant-•••••••••••••••••3xQ"],
+ ["OpenAI","O","--report",false,"gpt-5 / gpt-5-mini",""],
+ ["OpenRouter","R","--regulator",false,"any model, one key",""],
+ ["Ollama","L","--framework",true,"local · no key needed","— runs on localhost:11434"]];
+document.getElementById('prov').innerHTML=PROV.map((p,i)=>`
+  <div class="pcard ${p[3]?'active':''}">
+    <div class="ph"><div class="pi" style="background:var(${p[2]})">${p[1]}</div><div class="pn">${p[0]}<small>${p[4]}</small></div></div>
+    ${p[0]==='Ollama'?`<div class="keystate">● connected · ${p[5]}</div>`:
+      `<div class="keyrow"><input class="key" value="${p[5]}" ${p[5]?'':'placeholder="paste API key…"'}><button class="barbtn" onclick="this.closest('.pcard').querySelector('.keystate').classList.remove('empty');this.closest('.pcard').querySelector('.keystate').innerHTML='● saved to Keychain'">save</button></div>
+       <div class="keystate ${p[3]?'':'empty'}">${p[3]?'● saved to Keychain':'○ no key stored'}</div>`}
+  </div>`).join('');
+</script>
+</body>
+</html>

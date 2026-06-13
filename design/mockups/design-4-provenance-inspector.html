@@ -1,0 +1,223 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Noscia · 04 Provenance Inspector</title>
+<style>
+  :root{
+    /* PALETTE: muted plum + ink */
+    --bg:#201b22;--panel:#2a232f;--panel-2:#241e29;--rail:#1a151c;--field:#171218;
+    --line:#3b3340;--line-2:#2a232f;--hover:#2c2533;--sel:#2f2738;
+    --ink:#e9e2e7;--muted:#a99daa;--dim:#776b7a;
+    --accent:#b389a3;--accent-2:#9d7e9b;--accent-soft:rgba(179,137,163,.14);
+    --dense:#7d97ad;--bm25:#c2a368;--rerank:#b389a3;--rrf:#8fa07f;
+    --framework:#7d97ad;--regulator:#a08a9b;--ratings:#c2a368;--report:#8fa07f;--ngo:#7f9173;--news:#bd8a76;
+    --ok:#8fa07f;--bad:#bd8a76;
+    --sans:-apple-system,BlinkMacSystemFont,"Segoe UI",Inter,Roboto,Helvetica,Arial,sans-serif;
+    --mono:"SF Mono",ui-monospace,"JetBrains Mono",Menlo,Consolas,monospace;
+  }
+  *{box-sizing:border-box}html,body{height:100%}
+  body{margin:0;background:var(--bg);color:var(--ink);font-family:var(--sans);-webkit-font-smoothing:antialiased;display:flex;flex-direction:column;height:100vh;overflow:hidden}
+  ::-webkit-scrollbar{width:10px;height:10px}::-webkit-scrollbar-thumb{background:#473c4c;border-radius:6px;border:2px solid var(--bg)}
+
+  .switch{display:flex;align-items:center;gap:4px;height:38px;padding:0 12px;background:#150f17;border-bottom:1px solid var(--line-2);flex-shrink:0;font-family:var(--mono);font-size:11.5px}
+  .switch .tag{color:var(--dim);margin-right:6px;letter-spacing:.1em;font-size:10px}
+  .switch a{text-decoration:none;color:var(--dim);padding:4px 9px;border-radius:6px}.switch a:hover{color:var(--ink);background:#221b25}.switch a.on{color:var(--accent);background:var(--accent-soft)}.switch .home{margin-left:auto}
+
+  .app{flex:1;display:grid;grid-template-columns:62px 1fr;min-height:0}
+  .side{background:var(--rail);border-right:1px solid var(--line);display:flex;flex-direction:column;align-items:center;padding:12px 0;gap:4px}
+  .logo{width:34px;height:34px;border-radius:9px;background:linear-gradient(135deg,var(--accent),var(--accent-2));display:grid;place-items:center;font-weight:800;color:#241420;font-size:17px;margin-bottom:12px}
+  .nav{width:44px;height:44px;border-radius:11px;display:grid;place-items:center;color:var(--dim);cursor:pointer;position:relative}
+  .nav:hover{background:var(--hover);color:var(--ink)}.nav.on{background:var(--accent-soft);color:var(--accent)}.nav svg{width:20px;height:20px}
+  .nav .lab{position:absolute;left:52px;background:#0f0a11;border:1px solid var(--line);color:var(--ink);font-size:12px;padding:4px 9px;border-radius:7px;white-space:nowrap;opacity:0;visibility:hidden;transition:.12s;font-family:var(--mono);z-index:20;pointer-events:none}
+  .nav:hover .lab{opacity:1;visibility:visible}.side .spacer{flex:1}.side .idx{writing-mode:vertical-rl;font-family:var(--mono);font-size:9px;color:var(--dim);letter-spacing:.1em}
+
+  .stage{min-height:0;display:flex;flex-direction:column;overflow:hidden}
+  .view{display:none;flex:1;min-height:0}.view.on{display:flex;flex-direction:column}
+  .qhead{padding:13px 18px;border-bottom:1px solid var(--line);flex-shrink:0;background:linear-gradient(180deg,#2a232f,#241e29)}
+  .qbox{display:flex;align-items:center;gap:10px;background:var(--field);border:1px solid var(--line);border-radius:11px;padding:11px 14px}
+  .qbox svg{color:var(--muted)}.qbox input{flex:1;background:none;border:none;outline:none;color:var(--ink);font-size:15px}
+
+  /* search layout */
+  .splt{flex:1;display:grid;grid-template-columns:1.5fr 360px;min-height:0}
+  .left{overflow-y:auto;border-right:1px solid var(--line)}
+  .right{overflow-y:auto;background:var(--panel-2)}
+  .ministrip{display:flex;align-items:stretch;padding:16px 20px;border-bottom:1px solid var(--line);background:linear-gradient(180deg,#251f2a,#221c27);gap:0}
+  .stg{flex:1;text-align:center;position:relative}
+  .stg .ring{width:48px;height:48px;margin:0 auto 7px;border-radius:50%;border:2px solid var(--line);display:grid;place-items:center;font-family:var(--mono);font-weight:700;font-size:14px}
+  .stg .lbl{font-family:var(--mono);font-size:10px;text-transform:uppercase;letter-spacing:.05em;color:var(--muted)}.stg .sub{font-family:var(--mono);font-size:9.5px;color:var(--dim);margin-top:2px}
+  .stg:not(:last-child)::after{content:"";position:absolute;top:24px;right:-1px;width:calc(50% - 24px);height:2px;background:var(--line)}
+  .stg:not(:first-child)::before{content:"";position:absolute;top:24px;left:-1px;width:calc(50% - 24px);height:2px;background:var(--line)}
+  .stg.d .ring{border-color:var(--dense);color:var(--dense)}.stg.b .ring{border-color:var(--bm25);color:var(--bm25)}.stg.f .ring{border-color:var(--rrf);color:var(--rrf)}.stg.r .ring{border-color:var(--rerank);color:var(--rerank);box-shadow:0 0 0 4px var(--accent-soft)}
+  .lhead{display:flex;align-items:center;gap:10px;padding:13px 20px 6px;font-family:var(--mono);font-size:11px;color:var(--muted)}
+  .lhead .tier{margin-left:auto;display:flex;background:var(--field);border:1px solid var(--line);border-radius:8px;padding:3px}.lhead .tier button{background:none;border:none;font-family:var(--mono);font-size:11px;color:var(--muted);padding:5px 11px;border-radius:6px;cursor:pointer}.lhead .tier button.on{background:var(--accent);color:#241420;font-weight:700}
+
+  .res{padding:14px 20px;border-bottom:1px solid var(--line-2);cursor:pointer;border-left:2px solid transparent}
+  .res:hover{background:var(--hover)}.res.sel{background:var(--sel);border-left-color:var(--accent)}
+  .res-top{display:flex;align-items:center;gap:9px;margin-bottom:7px;flex-wrap:wrap}.rank{font-family:var(--mono);font-size:12px;color:var(--accent);font-weight:700}
+  .stype{font-family:var(--mono);font-size:10px;text-transform:uppercase;letter-spacing:.06em;padding:2px 7px;border-radius:5px}
+  .delta{font-family:var(--mono);font-size:10.5px;padding:1px 6px;border-radius:5px}.delta.up{color:var(--rrf);background:rgba(143,160,127,.14)}.delta.down{color:var(--news);background:rgba(189,138,118,.14)}.delta.flat{color:var(--dim);background:var(--panel)}
+  .res h3{font-size:14.5px;margin:0 0 3px;font-weight:620;line-height:1.3}.url{font-family:var(--mono);font-size:11px;color:var(--dim);margin-bottom:9px}
+  .snippet{font-size:12.5px;color:#cabfc9;line-height:1.5;margin-bottom:11px}.snippet mark{background:var(--accent-soft);box-shadow:inset 0 -2px 0 var(--accent);border-radius:2px;padding:0 1px;color:#f1e8ef}
+  .contrib{display:flex;height:7px;border-radius:4px;overflow:hidden;background:var(--field);margin-bottom:5px}.contrib i{display:block;height:100%}
+  .clabels{display:flex;gap:14px;font-family:var(--mono);font-size:10px;color:var(--dim)}.clabels span{display:flex;align-items:center;gap:5px}.clabels .d{width:7px;height:7px;border-radius:2px}
+
+  .ins{padding:22px 22px 60px}.ins-empty{height:100%;display:grid;place-items:center;color:var(--dim);font-family:var(--mono);font-size:12px;text-align:center;padding:40px}
+  .ins h2{font-size:11px;font-family:var(--mono);letter-spacing:.1em;text-transform:uppercase;color:var(--dim);margin:0 0 12px}
+  .ins .title{font-size:17px;font-weight:680;line-height:1.3;margin-bottom:4px}.ins .u{font-family:var(--mono);font-size:11px;color:var(--accent-2);word-break:break-all;margin-bottom:18px}
+  .badges{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:20px}.badge{font-family:var(--mono);font-size:10.5px;border:1px solid var(--line);border-radius:7px;padding:6px 9px;display:flex;flex-direction:column;gap:2px;background:var(--field)}.badge .k{color:var(--dim);font-size:9px;letter-spacing:.05em;text-transform:uppercase}.badge .v{color:var(--ink);font-weight:600}
+  .scorerow{display:flex;align-items:center;gap:10px;margin:9px 0;font-family:var(--mono);font-size:11.5px}.scorerow .name{width:88px;color:var(--muted)}.scorerow .track{flex:1;height:8px;background:var(--field);border-radius:4px;overflow:hidden}.scorerow .track i{display:block;height:100%}.scorerow .v{width:42px;text-align:right;color:var(--ink)}
+  .formula{margin-top:16px;background:var(--field);border:1px solid var(--line);border-radius:9px;padding:12px 13px;font-family:var(--mono);font-size:11px;color:var(--muted);line-height:1.7}.formula b{color:var(--rerank)}
+  .freshline{margin-top:18px;display:flex;align-items:center;gap:9px;font-family:var(--mono);font-size:11px;color:var(--muted)}.fbar{flex:1;height:6px;background:var(--field);border-radius:3px;overflow:hidden}.fbar i{display:block;height:100%;background:linear-gradient(90deg,var(--ngo),var(--bm25))}
+
+  /* generic pages */
+  .pad{padding:26px 32px 70px;overflow-y:auto;flex:1}
+  .pad h1{font-size:22px;font-weight:730;letter-spacing:-.02em;margin:0 0 4px}.pad .sub{color:var(--muted);font-size:13.5px;margin-bottom:24px}
+  .flow{display:flex;align-items:stretch;gap:0;margin:8px 0 30px}
+  .fcard{flex:1;background:var(--panel);border:1px solid var(--line);border-radius:13px;padding:16px;position:relative;margin-right:30px}
+  .fcard:last-child{margin-right:0}
+  .fcard:not(:last-child)::after{content:"→";position:absolute;right:-22px;top:50%;transform:translateY(-50%);color:var(--dim);font-size:16px}
+  .fcard .fl{font-family:var(--mono);font-size:10px;text-transform:uppercase;letter-spacing:.06em;color:var(--dim)}
+  .fcard .fn{font-size:15px;font-weight:680;margin:7px 0 3px}.fcard .fc{font-family:var(--mono);font-size:22px;font-weight:740}
+  .fcard .fp{font-family:var(--mono);font-size:10.5px;color:var(--muted);margin-top:8px;line-height:1.6;border-top:1px solid var(--line-2);padding-top:8px}
+  .fcard.d{border-top:2px solid var(--dense)}.fcard.b{border-top:2px solid var(--bm25)}.fcard.f{border-top:2px solid var(--rrf)}.fcard.r{border-top:2px solid var(--rerank)}
+  .setsec{margin:24px 0 12px;font-family:var(--mono);font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:var(--dim)}
+
+  table.grid{border-collapse:separate;border-spacing:0;width:100%;font-size:13px;background:var(--panel);border:1px solid var(--line);border-radius:13px;overflow:hidden}
+  table.grid th{text-align:left;font-family:var(--mono);font-size:10px;letter-spacing:.05em;text-transform:uppercase;color:var(--dim);font-weight:500;padding:12px 14px;border-bottom:1px solid var(--line);background:var(--panel-2)}
+  table.grid td{padding:12px 14px;border-bottom:1px solid var(--line-2)}table.grid tr:last-child td{border-bottom:none}
+  .win{color:var(--ok);font-family:var(--mono);font-weight:700}.lose{color:var(--dim);font-family:var(--mono)}
+  .barcell{display:flex;align-items:center;gap:8px}.bc{width:80px;height:7px;border-radius:4px;background:var(--field);overflow:hidden}.bc i{display:block;height:100%}
+  .cards{display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:14px;margin-bottom:8px}
+  .stat{background:var(--panel);border:1px solid var(--line);border-radius:13px;padding:16px}.stat .k{font-family:var(--mono);font-size:10.5px;text-transform:uppercase;letter-spacing:.06em;color:var(--dim)}.stat .v{font-size:25px;font-weight:740;margin-top:7px}.stat .d{font-family:var(--mono);font-size:11px;color:var(--ok);margin-top:5px}
+  .verdict{margin-top:24px;background:var(--panel);border:1px solid var(--line);border-left:3px solid var(--ok);border-radius:11px;padding:15px 17px;font-size:13.5px;color:var(--muted);line-height:1.6}.verdict b{color:var(--ink)}
+</style>
+</head>
+<body>
+  <nav class="switch">
+    <span class="tag">NOSCIA · DESIGN</span>
+    <a href="design-1-research-console.html">01 Console</a>
+    <a href="design-2-evidence-cards.html">02 Cards</a>
+    <a href="design-3-entity-workbench.html">03 Workbench</a>
+    <a class="on" href="design-4-provenance-inspector.html">04 Provenance</a>
+    <a href="design-5-command-palette.html">05 Palette</a>
+    <a class="home" href="index.html">↩ gallery</a>
+  </nav>
+
+  <div class="app">
+    <aside class="side">
+      <div class="logo">N</div>
+      <div class="nav on" data-view="search"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></svg><span class="lab">Search + inspect</span></div>
+      <div class="nav" data-view="pipeline"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="5" cy="6" r="2"/><circle cx="5" cy="18" r="2"/><circle cx="19" cy="12" r="2"/><path d="M7 6h6a4 4 0 0 1 4 4M7 18h6a4 4 0 0 0 4-4"/></svg><span class="lab">Pipeline</span></div>
+      <div class="nav" data-view="eval"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 3v18h18"/><rect x="7" y="11" width="3" height="6"/><rect x="12" y="7" width="3" height="10"/><rect x="17" y="13" width="3" height="4"/></svg><span class="lab">Eval · nDCG/MRR</span></div>
+      <div class="spacer"></div>
+      <div class="idx">retr 184ms</div>
+    </aside>
+
+    <div class="stage">
+      <!-- SEARCH -->
+      <section class="view on" id="view-search">
+        <div class="qhead"><div class="qbox"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></svg><input value="What is the difference between Scope 2 and Scope 3 emissions?" spellcheck="false"></div></div>
+        <div class="splt">
+          <div class="left">
+            <div class="ministrip">
+              <div class="stg d"><div class="ring">112</div><div class="lbl">Dense</div><div class="sub">Qwen3 cosine</div></div>
+              <div class="stg b"><div class="ring">98</div><div class="lbl">BM25</div><div class="sub">lexical</div></div>
+              <div class="stg f"><div class="ring">150</div><div class="lbl">RRF</div><div class="sub">k=60</div></div>
+              <div class="stg r"><div class="ring">6</div><div class="lbl">Rerank</div><div class="sub">bge-v2-m3</div></div>
+            </div>
+            <div class="lhead"><span>6 results · <b style="color:var(--ink)" id="rankmode">ranked after rerank</b> · 184ms</span><div class="tier"><button class="on" data-t="quality">Quality</button><button data-t="fast">Fast</button></div></div>
+            <div id="results"></div>
+          </div>
+          <div class="right"><div id="ins" class="ins-empty">select a result to inspect its provenance →<br><br>see how dense, BM25 and the reranker each contributed.</div></div>
+        </div>
+      </section>
+
+      <!-- PIPELINE -->
+      <section class="view" id="view-pipeline">
+        <div class="pad">
+          <h1>Retrieval pipeline</h1>
+          <div class="sub">The exact path every query takes. Quality tier shown — Fast tier stops after Dense.</div>
+          <div class="flow">
+            <div class="fcard d"><div class="fl">Stage 1a</div><div class="fn">Dense ANN</div><div class="fc">112</div><div class="fp">model Qwen3-0.6B<br>256-d matryoshka<br>cosine · top-k 100<br>~41 ms</div></div>
+            <div class="fcard b"><div class="fl">Stage 1b</div><div class="fn">BM25 FTS</div><div class="fc">98</div><div class="fp">LanceDB native FTS<br>lexical · top-k 100<br>~12 ms</div></div>
+            <div class="fcard f"><div class="fl">Stage 2</div><div class="fn">RRF fuse</div><div class="fc">150</div><div class="fp">reciprocal rank fusion<br>k = 60<br>dedupe by chunk id<br>~3 ms</div></div>
+            <div class="fcard r"><div class="fl">Stage 3</div><div class="fn">Cross-encoder</div><div class="fc">6</div><div class="fp">bge-reranker-v2-m3<br>rerank top-50 → 6<br>highlight extraction<br>~128 ms</div></div>
+          </div>
+          <div class="setsec">Per-stage timing · 184 ms total</div>
+          <table class="grid"><thead><tr><th>Stage</th><th>Candidates in → out</th><th>Latency</th><th>Share of total</th></tr></thead><tbody>
+            <tr><td><span style="color:var(--dense)">● </span>Dense ANN</td><td style="font-family:var(--mono)">4,182 → 100</td><td style="font-family:var(--mono)">41 ms</td><td><div class="barcell"><div class="bc"><i style="width:22%;background:var(--dense)"></i></div>22%</div></td></tr>
+            <tr><td><span style="color:var(--bm25)">● </span>BM25 FTS</td><td style="font-family:var(--mono)">4,182 → 100</td><td style="font-family:var(--mono)">12 ms</td><td><div class="barcell"><div class="bc"><i style="width:7%;background:var(--bm25)"></i></div>7%</div></td></tr>
+            <tr><td><span style="color:var(--rrf)">● </span>RRF fuse</td><td style="font-family:var(--mono)">200 → 150</td><td style="font-family:var(--mono)">3 ms</td><td><div class="barcell"><div class="bc"><i style="width:2%;background:var(--rrf)"></i></div>2%</div></td></tr>
+            <tr><td><span style="color:var(--rerank)">● </span>Cross-encoder</td><td style="font-family:var(--mono)">50 → 6</td><td style="font-family:var(--mono)">128 ms</td><td><div class="barcell"><div class="bc"><i style="width:69%;background:var(--rerank)"></i></div>69%</div></td></tr>
+          </tbody></table>
+          <div class="verdict"><b>The reranker is 69% of latency but the main quality lever.</b> Switching to the Fast tier drops stages 1b–3 and returns dense-only results in ~41 ms — the &lt;200 ms vs quality trade-off the UI exposes as a toggle.</div>
+        </div>
+      </section>
+
+      <!-- EVAL -->
+      <section class="view" id="view-eval">
+        <div class="pad">
+          <h1>Embedding eval · gate before shipping</h1>
+          <div class="sub">nDCG@10 and MRR on the held-out <code style="font-family:var(--mono);color:var(--ink)">esg_queries.jsonl</code> set. A model change ships only if it wins here.</div>
+          <div class="cards">
+            <div class="stat"><div class="k">nDCG@10 · fine-tuned</div><div class="v">0.71</div><div class="d">+0.08 vs base</div></div>
+            <div class="stat"><div class="k">MRR · fine-tuned</div><div class="v">0.68</div><div class="d">+0.07 vs base</div></div>
+            <div class="stat"><div class="k">Eval queries</div><div class="v">240</div><div class="d" style="color:var(--muted)">held-out</div></div>
+            <div class="stat"><div class="k">Verdict</div><div class="v" style="font-size:17px;color:var(--ok);padding-top:8px">SHIP ✓</div><div class="d" style="color:var(--muted)">wins on both</div></div>
+          </div>
+          <div class="setsec">Base Qwen3-0.6B  vs  fine-tuned on synthetic ESG pairs</div>
+          <table class="grid"><thead><tr><th>Query slice</th><th>Base nDCG@10</th><th>Fine-tuned nDCG@10</th><th>Δ</th></tr></thead><tbody>
+            <tr><td>Scope &amp; emissions definitions</td><td class="lose">0.66</td><td class="win">0.78</td><td class="win">+0.12</td></tr>
+            <tr><td>Framework cross-references</td><td class="lose">0.61</td><td class="win">0.70</td><td class="win">+0.09</td></tr>
+            <tr><td>Conceptual / semantic</td><td class="lose">0.58</td><td class="win">0.69</td><td class="win">+0.11</td></tr>
+            <tr><td>Ratings methodology</td><td class="lose">0.64</td><td class="win">0.67</td><td class="win">+0.03</td></tr>
+            <tr><td>Out-of-corpus (live needed)</td><td class="lose">0.31</td><td class="lose">0.33</td><td style="font-family:var(--mono);color:var(--bad)">+0.02</td></tr>
+          </tbody></table>
+          <div class="verdict"><b>Fine-tuned wins on every in-corpus slice → ship it.</b> The out-of-corpus slice stays low for both models, which is expected — that's what the live-search fallback is for, not the embedding model.</div>
+        </div>
+      </section>
+    </div>
+  </div>
+
+<script>
+const tint=(c,a)=>`color-mix(in srgb, var(${c}) ${a}%, transparent)`;
+document.querySelectorAll('.nav').forEach(n=>n.onclick=()=>{document.querySelectorAll('.nav').forEach(x=>x.classList.remove('on'));n.classList.add('on');document.querySelectorAll('.view').forEach(v=>v.classList.toggle('on',v.id==='view-'+n.dataset.view))});
+
+const DATA=[
+ {rank:1,stype:"framework",c:"--framework",delta:"+3",dir:"up",org:"GHG Protocol",title:"Scope 2 Guidance — Emissions from Purchased Energy",url:"ghgprotocol.org/scope-2-guidance",snippet:"<mark>Scope 2 covers indirect emissions from purchased electricity</mark>; <mark>Scope 3 covers all other indirect value-chain emissions</mark>.",dense:.71,bm25:.55,rrf:.031,rerank:.97,crawled:"4 days ago",freshpct:88,recadence:"monthly",reason:"Reranker promoted #4 → #1: answers the comparison directly, which the bi-encoder under-weighted."},
+ {rank:2,stype:"framework",c:"--framework",delta:"−1",dir:"down",org:"GRI",title:"GRI 305: Emissions 2016 — Disclosure 305-3",url:"globalreporting.org/standards/gri-305",snippet:"<mark>305-3 covers other indirect (Scope 3) emissions</mark>, reported separately from Scope 2.",dense:.74,bm25:.42,rrf:.030,rerank:.92,crawled:"11 days ago",freshpct:62,recadence:"monthly",reason:"Strongest dense match (#1 pre-rerank) but less direct on the 'difference', so settled at #2."},
+ {rank:3,stype:"ngo",c:"--ngo",delta:"+5",dir:"up",org:"CDP",title:"Technical Note: Relevance of Scope 3",url:"cdp.net/guidance/scope-3-technical-note",snippet:"<mark>Scope 3 is on average 11× larger than Scope 1 and 2 combined</mark>.",dense:.58,bm25:.61,rrf:.026,rerank:.86,crawled:"2 days ago",freshpct:96,recadence:"weekly",reason:"BM25 found it on exact tokens; reranker confirmed the contrast. Climbed from #8."},
+ {rank:4,stype:"regulator",c:"--regulator",delta:"0",dir:"flat",org:"ISSB / IFRS",title:"IFRS S2 — GHG Emissions disclosure",url:"ifrs.org/issb/ifrs-s2/ghg-emissions",snippet:"Disclose <mark>absolute gross Scope 1, 2 and 3 emissions</mark>, with Scope 3 by category.",dense:.63,bm25:.49,rrf:.024,rerank:.81,crawled:"9 days ago",freshpct:70,recadence:"monthly",reason:"Steady across all stages — relevant, but lists scopes rather than contrasting them."},
+ {rank:5,stype:"ratings",c:"--ratings",delta:"−2",dir:"down",org:"MSCI",title:"Carbon Emissions Methodology",url:"msci.com/esg/methodology/carbon-emissions",snippet:"<mark>Scope 3 estimated via input-output models</mark>; Scope 2 from grid factors.",dense:.66,bm25:.38,rrf:.022,rerank:.74,crawled:"16 days ago",freshpct:48,recadence:"monthly",reason:"Dense pulled it high on vocabulary; reranker discounted it as methodology, not definition."},
+ {rank:6,stype:"report",c:"--report",delta:"new",dir:"up",org:"Illustrative Issuer plc",title:"Climate Transition Action Plan 2025",url:"example-issuer.com/ctap-2025.pdf",snippet:"\"<mark>Scope 3 represents 94% of our footprint</mark>; <mark>Scope 2 market-based is near zero</mark>.\"",dense:.49,bm25:.52,rrf:.019,rerank:.69,crawled:"6 days ago",freshpct:84,recadence:"quarterly",reason:"Only surfaced by BM25 prefetch; reranker kept it for the concrete illustration."}
+];
+const results=document.getElementById('results'),ins=document.getElementById('ins');
+const contrib=d=>{const s=d.dense+d.bm25+d.rerank;const pd=Math.round(d.dense/s*100),pb=Math.round(d.bm25/s*100);return{pd,pb,pr:100-pd-pb}};
+function render(){
+  results.innerHTML=DATA.map((d,i)=>{const{pd,pb,pr}=contrib(d);const dc=d.dir==='up'?'up':d.dir==='down'?'down':'flat';
+   return `<div class="res" data-i="${i}"><div class="res-top"><span class="rank">#${d.rank}</span><span class="stype" style="color:var(${d.c});background:${tint(d.c,12)};border:1px solid ${tint(d.c,30)}">${d.stype}</span><span class="delta ${dc}">rerank ${d.delta==='new'?'NEW':d.delta}</span></div>
+   <h3>${d.title}</h3><div class="url">${d.org} · ${d.url}</div><div class="snippet">${d.snippet}</div>
+   <div class="contrib"><i style="width:${pd}%;background:var(--dense)"></i><i style="width:${pb}%;background:var(--bm25)"></i><i style="width:${pr}%;background:var(--rerank)"></i></div>
+   <div class="clabels"><span><i class="d" style="background:var(--dense)"></i>dense ${pd}%</span><span><i class="d" style="background:var(--bm25)"></i>bm25 ${pb}%</span><span><i class="d" style="background:var(--rerank)"></i>rerank ${pr}%</span></div></div>`}).join('');
+  results.querySelectorAll('.res').forEach(el=>el.onclick=()=>select(+el.dataset.i,el));
+}
+function select(i,el){
+  results.querySelectorAll('.res').forEach(r=>r.classList.remove('sel'));el.classList.add('sel');const d=DATA[i];ins.className='ins';
+  ins.innerHTML=`<h2>provenance · why this ranked #${d.rank}</h2><div class="title">${d.title}</div><div class="u">${d.url}</div>
+   <div class="badges"><div class="badge"><span class="k">source type</span><span class="v" style="color:var(${d.c})">${d.stype}</span></div><div class="badge"><span class="k">crawled</span><span class="v">${d.crawled}</span></div><div class="badge"><span class="k">recrawl</span><span class="v">${d.recadence}</span></div><div class="badge"><span class="k">rank move</span><span class="v">${d.delta==='new'?'newly surfaced':d.delta+' vs pre-rerank'}</span></div></div>
+   <h2>stage scores</h2>
+   <div class="scorerow"><span class="name">dense cosine</span><span class="track"><i style="width:${d.dense*100}%;background:var(--dense)"></i></span><span class="v">${d.dense.toFixed(2)}</span></div>
+   <div class="scorerow"><span class="name">bm25 (norm)</span><span class="track"><i style="width:${d.bm25*100}%;background:var(--bm25)"></i></span><span class="v">${d.bm25.toFixed(2)}</span></div>
+   <div class="scorerow"><span class="name">rrf fused</span><span class="track"><i style="width:${d.rrf*1500}%;background:var(--rrf)"></i></span><span class="v">${d.rrf.toFixed(3)}</span></div>
+   <div class="scorerow"><span class="name">rerank</span><span class="track"><i style="width:${d.rerank*100}%;background:var(--rerank)"></i></span><span class="v">${d.rerank.toFixed(2)}</span></div>
+   <div class="formula">final rank ← <b>cross-encoder(${d.rerank.toFixed(2)})</b> over RRF candidates<br>RRF = Σ 1/(60 + rankᵢ) over {dense, bm25}</div>
+   <div class="freshline"><span>freshness</span><span class="fbar"><i style="width:${d.freshpct}%"></i></span><span>${d.freshpct}%</span></div>
+   <div class="formula" style="border-color:${tint(d.c,40)}">↳ ${d.reason}</div>`;
+}
+document.querySelectorAll('.tier button').forEach(b=>b.onclick=()=>{document.querySelectorAll('.tier button').forEach(x=>x.classList.remove('on'));b.classList.add('on');const fast=b.dataset.t==='fast';document.querySelectorAll('.stg.b,.stg.f,.stg.r').forEach(s=>s.style.opacity=fast?.3:1);document.getElementById('rankmode').textContent=fast?'ranked by dense cosine only':'ranked after rerank'});
+render();
+</script>
+</body>
+</html>

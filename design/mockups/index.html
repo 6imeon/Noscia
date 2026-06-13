@@ -1,0 +1,99 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Noscia — UI design directions</title>
+<style>
+  :root{
+    --bg:#1a1714;--panel:#231f1b;--line:#352f28;--ink:#ece5da;--muted:#a59a8a;--dim:#776c5c;
+    --sans:-apple-system,BlinkMacSystemFont,"Segoe UI",Inter,Roboto,Helvetica,Arial,sans-serif;
+    --mono:"SF Mono",ui-monospace,"JetBrains Mono",Menlo,Consolas,monospace;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:
+      radial-gradient(1100px 560px at 82% -10%, rgba(204,138,92,.10), transparent 60%),
+      radial-gradient(900px 480px at 0% 0%, rgba(127,166,160,.07), transparent 55%),
+      var(--bg);color:var(--ink);font-family:var(--sans);line-height:1.5;-webkit-font-smoothing:antialiased;}
+  .wrap{max-width:1100px;margin:0 auto;padding:60px 28px 100px}
+  .brand{display:flex;align-items:center;gap:12px;margin-bottom:6px}
+  .logo{width:34px;height:34px;border-radius:9px;background:linear-gradient(135deg,#cc8a5c,#7fa6a0);display:grid;place-items:center;font-weight:800;color:#221a12;font-size:18px}
+  h1{font-size:14px;letter-spacing:.16em;text-transform:uppercase;color:var(--muted);margin:0;font-weight:600}
+  .hero{font-size:38px;line-height:1.14;font-weight:740;letter-spacing:-.02em;margin:24px 0 14px;max-width:780px}
+  .hero span{color:#cc8a5c}
+  .lede{color:var(--muted);max-width:700px;font-size:16.5px}
+  .meta{display:flex;gap:22px;flex-wrap:wrap;margin:24px 0 4px;color:var(--muted);font-size:12.5px;font-family:var(--mono)}
+  .meta b{color:var(--ink);font-weight:600}
+  .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(320px,1fr));gap:18px;margin-top:38px}
+  a.card{display:block;text-decoration:none;color:inherit;background:var(--panel);border:1px solid var(--line);border-radius:16px;overflow:hidden;transition:.18s transform,.18s border-color,.18s box-shadow}
+  a.card:hover{transform:translateY(-4px);box-shadow:0 18px 50px -24px rgba(0,0,0,.6)}
+  .thumb{height:140px;border-bottom:1px solid var(--line);position:relative;overflow:hidden}
+  .thumb svg{position:absolute;inset:0;width:100%;height:100%}
+  .swatches{display:flex;height:6px}
+  .swatches i{flex:1}
+  .cbody{padding:15px 18px 19px}
+  .num{font-family:var(--mono);font-size:11px;letter-spacing:.1em}
+  .ctitle{font-size:18px;font-weight:680;margin:6px 0 6px;letter-spacing:-.01em}
+  .cdesc{color:var(--muted);font-size:13.5px}
+  .views{display:flex;gap:6px;flex-wrap:wrap;margin-top:12px}
+  .v{font-size:10.5px;font-family:var(--mono);color:var(--muted);border:1px solid var(--line);border-radius:6px;padding:2px 8px}
+  .palname{float:right;font-family:var(--mono);font-size:10.5px;color:var(--dim)}
+  footer{margin-top:54px;color:var(--muted);font-size:13px;border-top:1px solid var(--line);padding-top:22px}
+  footer code{font-family:var(--mono);color:var(--ink);background:#15110d;padding:1px 6px;border-radius:5px}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="brand"><div class="logo">N</div><h1>Noscia · neural ESG search</h1></div>
+  <div class="hero">Five directions, five <span>distinct palettes</span>, each a clickable app.</div>
+  <p class="lede">Each direction now has its own muted palette <em>and</em> multiple views you can navigate — search, the entity table, corpus &amp; index status, and BYOK settings. Same sample ESG query and corpus throughout. Open one and use its internal nav (sidebar, tabs, or <span style="font-family:var(--mono)">1–4</span> keys) to move between pages; the slim top bar jumps between the five directions.</p>
+
+  <div class="meta">
+    <span>Query · <b>Scope 2 vs Scope 3</b></span>
+    <span>Corpus · <b>ESG frameworks + disclosures</b></span>
+    <span>Data · <b>illustrative placeholders</b></span>
+  </div>
+
+  <div class="grid">
+    <!-- 01 espresso -->
+    <a class="card" href="design-1-research-console.html" style="--a:#cc8a5c">
+      <div class="swatches"><i style="background:#201b16"></i><i style="background:#cc8a5c"></i><i style="background:#8b97a3"></i><i style="background:#c2a368"></i><i style="background:#92a07c"></i></div>
+      <div class="thumb"><svg viewBox="0 0 320 140" preserveAspectRatio="none"><rect width="320" height="140" fill="#201b16"/><rect x="0" y="0" width="46" height="140" fill="#1b1611"/><rect x="13" y="12" width="20" height="20" rx="6" fill="#cc8a5c"/><rect x="11" y="42" width="24" height="24" rx="7" fill="#322617"/><rect x="60" y="14" width="120" height="104" rx="5" fill="#241e18" stroke="#3a3127"/><rect x="70" y="26" width="70" height="6" rx="3" fill="#cc8a5c"/><rect x="70" y="40" width="100" height="4" rx="2" fill="#3a3127"/><rect x="70" y="62" width="56" height="6" rx="3" fill="#8b97a3"/><rect x="70" y="76" width="100" height="4" rx="2" fill="#3a3127"/><rect x="196" y="14" width="110" height="104" rx="5" fill="#241e18" stroke="#3a3127"/><rect x="206" y="28" width="88" height="5" rx="2.5" fill="#473b2d"/><rect x="206" y="44" width="80" height="22" rx="3" fill="rgba(204,138,92,.18)"/></svg></div>
+      <div class="cbody"><div class="num" style="color:var(--a)">DIRECTION 01<span class="palname">espresso · terracotta</span></div><div class="ctitle">Research Console</div><div class="cdesc">Two-pane reader with the highlight in context. Sidebar app — full corpus dashboard and BYOK settings included.</div><div class="views"><span class="v">Search</span><span class="v">Entity</span><span class="v">Corpus</span><span class="v">Settings</span></div></div>
+    </a>
+
+    <!-- 02 linen sage -->
+    <a class="card" href="design-2-evidence-cards.html" style="--a:#5f7b56">
+      <div class="swatches"><i style="background:#f1eee4"></i><i style="background:#5f7b56"></i><i style="background:#a17c46"></i><i style="background:#5b7286"></i><i style="background:#7e6480"></i></div>
+      <div class="thumb"><svg viewBox="0 0 320 140" preserveAspectRatio="none"><rect width="320" height="140" fill="#f1eee4"/><rect x="0" y="0" width="320" height="22" fill="#f5f2e9"/><rect x="64" y="34" width="192" height="20" rx="10" fill="#fbfaf3" stroke="#e2dccd"/><rect x="64" y="62" width="192" height="30" rx="8" fill="#fbfaf3" stroke="#e2dccd"/><rect x="74" y="70" width="34" height="5" rx="2.5" fill="#5b7286"/><rect x="74" y="80" width="168" height="6" rx="3" fill="rgba(95,123,86,.4)"/><rect x="64" y="100" width="192" height="28" rx="8" fill="#fbfaf3" stroke="#e2dccd"/><rect x="74" y="108" width="34" height="5" rx="2.5" fill="#7e6480"/><rect x="74" y="118" width="150" height="6" rx="3" fill="rgba(95,123,86,.3)"/></svg></div>
+      <div class="cbody"><div class="num" style="color:var(--a)">DIRECTION 02<span class="palname">linen · sage</span></div><div class="ctitle">Evidence Cards</div><div class="cdesc">Calm light/editorial reading. Passage pull-quotes, hover citations, plus saved Collections and a light Settings page.</div><div class="views"><span class="v">Search</span><span class="v">Collections</span><span class="v">Settings</span></div></div>
+    </a>
+
+    <!-- 03 slate -->
+    <a class="card" href="design-3-entity-workbench.html" style="--a:#7fa6a0">
+      <div class="swatches"><i style="background:#191e23"></i><i style="background:#7fa6a0"></i><i style="background:#c2a368"></i><i style="background:#92a07c"></i><i style="background:#bd8a76"></i></div>
+      <div class="thumb"><svg viewBox="0 0 320 140" preserveAspectRatio="none"><rect width="320" height="140" fill="#191e23"/><rect x="0" y="0" width="58" height="140" fill="#161b20"/><rect x="10" y="12" width="40" height="22" rx="5" fill="#212931" stroke="#313c46"/><rect x="10" y="40" width="40" height="16" rx="4" fill="#212931"/><rect x="72" y="14" width="234" height="112" rx="5" fill="#212931" stroke="#313c46"/><rect x="72" y="14" width="234" height="22" fill="#1c232a"/><line x1="140" y1="14" x2="140" y2="126" stroke="#313c46"/><line x1="206" y1="14" x2="206" y2="126" stroke="#313c46"/><line x1="262" y1="14" x2="262" y2="126" stroke="#313c46"/><line x1="72" y1="58" x2="306" y2="58" stroke="#222b33"/><line x1="72" y1="84" x2="306" y2="84" stroke="#222b33"/><circle cx="220" cy="47" r="3.5" fill="#7fa6a0"/><circle cx="220" cy="71" r="3.5" fill="#c2a368"/><circle cx="278" cy="47" r="3.5" fill="#7fa6a0"/></svg></div>
+      <div class="cbody"><div class="num" style="color:var(--a)">DIRECTION 03<span class="palname">slate · steel</span></div><div class="ctitle">Entity Workbench</div><div class="cdesc">The showpiece. Websets list, the cited spreadsheet with cell-evidence drawers, a schema editor, sources, and CSV/JSON export.</div><div class="views"><span class="v">Websets</span><span class="v">Table</span><span class="v">Schema</span><span class="v">Export</span></div></div>
+    </a>
+
+    <!-- 04 plum -->
+    <a class="card" href="design-4-provenance-inspector.html" style="--a:#b389a3">
+      <div class="swatches"><i style="background:#201b22"></i><i style="background:#b389a3"></i><i style="background:#7d97ad"></i><i style="background:#c2a368"></i><i style="background:#8fa07f"></i></div>
+      <div class="thumb"><svg viewBox="0 0 320 140" preserveAspectRatio="none"><rect width="320" height="140" fill="#201b22"/><rect x="0" y="0" width="58" height="140" fill="#1a151c"/><rect x="72" y="14" width="160" height="112" rx="5" fill="#2a232f" stroke="#3b3340"/><rect x="240" y="14" width="66" height="112" rx="5" fill="#241e29" stroke="#3b3340"/><circle cx="96" cy="36" r="8" fill="none" stroke="#7d97ad" stroke-width="2"/><circle cx="134" cy="36" r="8" fill="none" stroke="#c2a368" stroke-width="2"/><circle cx="172" cy="36" r="8" fill="none" stroke="#8fa07f" stroke-width="2"/><circle cx="210" cy="36" r="8" fill="none" stroke="#b389a3" stroke-width="2"/><line x1="104" y1="36" x2="126" y2="36" stroke="#3b3340"/><line x1="142" y1="36" x2="164" y2="36" stroke="#3b3340"/><line x1="180" y1="36" x2="202" y2="36" stroke="#3b3340"/><rect x="84" y="64" width="40" height="6" rx="3" fill="#7d97ad"/><rect x="124" y="64" width="30" height="6" rx="3" fill="#c2a368"/><rect x="154" y="64" width="50" height="6" rx="3" fill="#b389a3"/><rect x="250" y="30" width="46" height="8" rx="2" fill="#171218"/><rect x="250" y="46" width="46" height="8" rx="2" fill="#171218"/><rect x="250" y="62" width="28" height="8" rx="2" fill="rgba(179,137,163,.3)"/></svg></div>
+      <div class="cbody"><div class="num" style="color:var(--a)">DIRECTION 04<span class="palname">plum · ink</span></div><div class="cdesc" style="display:none"></div><div class="ctitle">Provenance Inspector</div><div class="cdesc">Transparency-first. Per-result score breakdowns, a full pipeline page with timings, and an nDCG/MRR eval dashboard that gates model changes.</div><div class="views"><span class="v">Search</span><span class="v">Pipeline</span><span class="v">Eval</span></div></div>
+    </a>
+
+    <!-- 05 graphite -->
+    <a class="card" href="design-5-command-palette.html" style="--a:#cda468">
+      <div class="swatches"><i style="background:#18171a"></i><i style="background:#cda468"></i><i style="background:#8b97a3"></i><i style="background:#a08a9b"></i><i style="background:#7f9173"></i></div>
+      <div class="thumb"><svg viewBox="0 0 320 140" preserveAspectRatio="none"><rect width="320" height="140" fill="#100f12"/><rect x="46" y="24" width="228" height="96" rx="11" fill="#232125" stroke="#36333b"/><rect x="60" y="38" width="100" height="9" rx="4" fill="#cda468"/><rect x="60" y="56" width="40" height="10" rx="3" fill="rgba(205,164,104,.16)"/><rect x="106" y="56" width="36" height="10" rx="3" fill="#1d1c1f"/><rect x="60" y="74" width="150" height="11" rx="3" fill="rgba(205,164,104,.12)"/><rect x="66" y="76" width="80" height="6" rx="3" fill="#3c3941"/><rect x="60" y="92" width="150" height="11" rx="3" fill="#1d1c1f"/><rect x="226" y="38" width="40" height="74" rx="4" fill="#1d1c1f"/></svg></div>
+      <div class="cbody"><div class="num" style="color:var(--a)">DIRECTION 05<span class="palname">graphite · amber</span></div><div class="ctitle">Command Palette</div><div class="cdesc">Keyboard-first, near-monochrome. Switch modes (Search / Entity / Commands / Recent) with 1–4, run commands, open a BYOK settings sheet.</div><div class="views"><span class="v">Search</span><span class="v">Entity</span><span class="v">Commands</span><span class="v">Recent</span></div></div>
+    </a>
+  </div>
+
+  <footer>
+    Standalone HTML — no build step, no network, no dependencies. Open from disk or serve with <code>python3 -m http.server</code>. Each direction carries its own palette and an internal nav; sample ESG values are illustrative placeholders, <b style="color:var(--ink)">not real disclosures</b>. Rationale + research sources in <code>DESIGN-NOTES.md</code>.
+  </footer>
+</div>
+</body>
+</html>

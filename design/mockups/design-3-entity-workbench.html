@@ -1,0 +1,350 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Noscia · 03 Entity Workbench</title>
+<style>
+  :root{
+    /* PALETTE: cool slate + steel (muted, desaturated) */
+    --bg:#191e23;--panel:#212931;--panel-2:#1c232a;--rail:#161b20;--field:#141a1f;
+    --line:#313c46;--line-2:#222b33;--hover:#222b2b;--sel:#23303133;
+    --ink:#dde4ea;--muted:#8c98a4;--dim:#5f6b76;
+    --accent:#7fa6a0;--accent-2:#6d8aa0;--accent-soft:rgba(127,166,160,.14);
+    --ok:#7fa6a0;--est:#c2a368;--null:#5f6b76;--bad:#bd8a76;
+    --framework:#8b97a3;--regulator:#a08a9b;--ratings:#c2a368;--report:#92a07c;--ngo:#7f9173;--news:#bd8a76;
+    --sans:-apple-system,BlinkMacSystemFont,"Segoe UI",Inter,Roboto,Helvetica,Arial,sans-serif;
+    --mono:"SF Mono",ui-monospace,"JetBrains Mono",Menlo,Consolas,monospace;
+  }
+  *{box-sizing:border-box}html,body{height:100%}
+  body{margin:0;background:var(--bg);color:var(--ink);font-family:var(--sans);-webkit-font-smoothing:antialiased;display:flex;flex-direction:column;height:100vh;overflow:hidden}
+  ::-webkit-scrollbar{width:10px;height:10px}::-webkit-scrollbar-thumb{background:#36424c;border-radius:6px;border:2px solid var(--bg)}
+
+  .switch{display:flex;align-items:center;gap:4px;height:38px;padding:0 12px;background:#11161a;border-bottom:1px solid var(--line-2);flex-shrink:0;font-family:var(--mono);font-size:11.5px}
+  .switch .tag{color:var(--dim);margin-right:6px;letter-spacing:.1em;font-size:10px}
+  .switch a{text-decoration:none;color:var(--dim);padding:4px 9px;border-radius:6px}
+  .switch a:hover{color:var(--ink);background:#1b2228}.switch a.on{color:var(--accent);background:var(--accent-soft)}.switch .home{margin-left:auto}
+
+  .qhead{padding:12px 18px;border-bottom:1px solid var(--line);background:linear-gradient(180deg,#212931,#1c232a);flex-shrink:0}
+  .qtop{display:flex;align-items:center;gap:12px}
+  .logo{width:30px;height:30px;border-radius:8px;background:linear-gradient(135deg,var(--accent),var(--accent-2));display:grid;place-items:center;font-weight:800;color:#10211f;font-size:15px;flex-shrink:0}
+  .qbox{flex:1;display:flex;align-items:center;gap:10px;background:var(--field);border:1px solid var(--line);border-radius:11px;padding:10px 14px}
+  .qbox svg{color:var(--accent)}.qbox input{flex:1;background:none;border:none;outline:none;color:var(--ink);font-size:14.5px}
+  .qbox .mode{font-family:var(--mono);font-size:10px;color:var(--accent);border:1px solid var(--accent);background:var(--accent-soft);border-radius:6px;padding:3px 8px;letter-spacing:.05em}
+  .agentbar{display:flex;align-items:center;gap:0;margin-top:11px;font-family:var(--mono);font-size:11px}
+  .step{display:flex;align-items:center;gap:7px;color:var(--dim);padding:3px 0}
+  .step .b{width:16px;height:16px;border-radius:50%;border:1.5px solid var(--line);display:grid;place-items:center;font-size:9px}
+  .step.done{color:var(--ok)}.step.done .b{border-color:var(--ok);background:var(--accent-soft);color:var(--ok)}
+  .step.now{color:var(--accent-2)}.step.now .b{border-color:var(--accent-2);box-shadow:0 0 0 3px rgba(109,138,160,.18)}
+  .arr{width:24px;height:1px;background:var(--line);margin:0 8px}.agentbar .meta{margin-left:auto;color:var(--muted)}
+
+  .body{flex:1;display:grid;grid-template-columns:214px 1fr;min-height:0}
+  /* websets rail */
+  .rail{background:var(--rail);border-right:1px solid var(--line);overflow-y:auto;padding:14px 12px 40px}
+  .rail .rh{font-family:var(--mono);font-size:10px;letter-spacing:.1em;text-transform:uppercase;color:var(--dim);margin:0 0 10px;display:flex;align-items:center}
+  .rail .rh button{margin-left:auto;background:none;border:1px solid var(--line);color:var(--accent);border-radius:6px;font-family:var(--mono);font-size:13px;width:22px;height:22px;cursor:pointer;line-height:1}
+  .wset{padding:10px 11px;border-radius:10px;cursor:pointer;margin-bottom:5px;border:1px solid transparent}
+  .wset:hover{background:var(--hover)}.wset.on{background:var(--panel);border-color:var(--line)}
+  .wset .t{font-size:12.5px;font-weight:600;line-height:1.35;margin-bottom:5px}
+  .wset .m{font-family:var(--mono);font-size:10px;color:var(--dim);display:flex;gap:8px}
+  .wset .m .pill{color:var(--ok)}
+  .rail .rh2{margin-top:22px}
+  .facet{display:flex;align-items:center;gap:8px;padding:5px 2px;font-size:12px;color:var(--muted);cursor:pointer}
+  .facet:hover{color:var(--ink)}.facet input{accent-color:var(--accent);width:13px;height:13px}
+  .facet .n{margin-left:auto;font-family:var(--mono);font-size:10px;color:var(--dim);background:var(--panel);border-radius:4px;padding:1px 6px}
+  .facet .sw{width:8px;height:8px;border-radius:2px}
+
+  .work{display:flex;flex-direction:column;min-width:0}
+  .tabs{display:flex;align-items:center;gap:4px;padding:8px 18px;border-bottom:1px solid var(--line);flex-shrink:0}
+  .tabs button{background:none;border:none;font-family:var(--mono);font-size:12px;color:var(--muted);padding:7px 13px;border-radius:8px;cursor:pointer}
+  .tabs button:hover{background:var(--hover);color:var(--ink)}.tabs button.on{background:var(--accent-soft);color:var(--accent)}
+  .tabs .right{margin-left:auto;display:flex;gap:8px}
+  .btn{font-family:var(--mono);font-size:11.5px;padding:7px 12px;border-radius:8px;border:1px solid var(--line);background:var(--panel);color:var(--ink);cursor:pointer}
+  .btn:hover{border-color:var(--accent);color:var(--accent)}.btn.primary{background:var(--accent);color:#10211f;border-color:var(--accent);font-weight:700}
+
+  .tabview{flex:1;min-height:0;overflow:hidden;display:none;flex-direction:column}.tabview.on{display:flex}
+  .legendbar{display:flex;align-items:center;gap:14px;padding:9px 18px;border-bottom:1px solid var(--line);flex-shrink:0;font-family:var(--mono);font-size:10.5px;color:var(--dim)}
+  .legendbar .count{color:var(--muted)}.legendbar .count b{color:var(--ink)}
+  .legendbar .lg{display:flex;gap:14px;margin-left:6px}.legendbar .lg span{display:flex;align-items:center;gap:5px}
+  .ev{width:8px;height:8px;border-radius:50%;display:inline-block}
+  .ev.ok{background:var(--ok)}.ev.est{background:transparent;border:1.5px solid var(--est);width:7px;height:7px}.ev.null{background:transparent;border:1.5px dashed var(--null);width:7px;height:7px}
+
+  .scroll{overflow:auto;flex:1}
+  table{border-collapse:separate;border-spacing:0;width:100%;font-size:13px}
+  thead th{position:sticky;top:0;background:var(--panel);text-align:left;font-family:var(--mono);font-size:10.5px;letter-spacing:.05em;text-transform:uppercase;color:var(--muted);font-weight:500;padding:11px 12px;border-bottom:1px solid var(--line);white-space:nowrap;z-index:2}
+  thead th:first-child{position:sticky;left:0;z-index:3}
+  tbody td{padding:0;border-bottom:1px solid var(--line-2);white-space:nowrap}
+  tbody td:first-child{position:sticky;left:0;background:var(--panel-2);z-index:1;border-right:1px solid var(--line)}
+  .cell{padding:11px 12px;display:flex;align-items:center;gap:8px;cursor:pointer;min-height:42px;border-left:2px solid transparent}
+  .cell:hover{background:var(--hover);border-left-color:rgba(127,166,160,.4)}.cell.sel{background:#243031;border-left-color:var(--accent)}
+  .company{font-weight:640}.company small{display:block;font-family:var(--mono);font-size:10px;color:var(--dim);font-weight:400}
+  .val{color:#cdd6df}.val.null{color:var(--null);font-style:italic}
+  .pill{font-family:var(--mono);font-size:10px;padding:2px 7px;border-radius:5px}.pill.yes{color:var(--ok);background:var(--accent-soft)}.pill.no{color:var(--est);background:rgba(194,163,104,.14)}
+  .fw{display:flex;gap:4px}.fw b{font-family:var(--mono);font-size:9.5px;font-weight:600;padding:1px 5px;border-radius:4px}
+  .rating{font-family:var(--mono);font-weight:700;font-size:11px;padding:2px 7px;border-radius:5px}.ctrv{color:var(--bad)}
+
+  /* schema view */
+  .pad{padding:24px 26px 60px;overflow-y:auto;flex:1}
+  .pad h2{font-size:16px;margin:0 0 4px}.pad .sub{color:var(--muted);font-size:13px;margin-bottom:20px}
+  .field{display:flex;align-items:center;gap:12px;background:var(--panel);border:1px solid var(--line);border-radius:11px;padding:12px 15px;margin-bottom:9px}
+  .field .grip{color:var(--dim);cursor:grab}.field .fn{font-weight:600;font-size:13.5px}.field .ft{font-family:var(--mono);font-size:11px;color:var(--muted)}
+  .field .typ{margin-left:auto;font-family:var(--mono);font-size:10.5px;color:var(--accent);border:1px solid var(--line);border-radius:6px;padding:3px 8px}
+  .field .req{font-family:var(--mono);font-size:10px;color:var(--est)}
+  .field .x{background:none;border:none;color:var(--dim);cursor:pointer;font-size:15px}.field .x:hover{color:var(--bad)}
+  .addfield{display:flex;gap:10px;margin-top:16px}
+  .addfield input{flex:1;background:var(--field);border:1px solid var(--line);border-radius:10px;padding:10px 13px;color:var(--ink);outline:none;font-family:var(--mono);font-size:12.5px}.addfield input:focus{border-color:var(--accent)}
+
+  /* sources view */
+  table.grid2{border-collapse:separate;border-spacing:0;width:100%;font-size:13px;background:var(--panel);border:1px solid var(--line);border-radius:12px;overflow:hidden}
+  table.grid2 th{text-align:left;font-family:var(--mono);font-size:10px;letter-spacing:.05em;text-transform:uppercase;color:var(--dim);font-weight:500;padding:11px 14px;border-bottom:1px solid var(--line);background:var(--panel-2)}
+  table.grid2 td{padding:11px 14px;border-bottom:1px solid var(--line-2)}table.grid2 tr:last-child td{border-bottom:none}
+  .dot{width:8px;height:8px;border-radius:50%;display:inline-block;margin-right:7px;vertical-align:middle}
+
+  /* drawer */
+  .drawer{position:fixed;top:0;right:0;width:430px;max-width:92vw;height:100vh;background:var(--panel);border-left:1px solid var(--line);box-shadow:-30px 0 60px -30px rgba(0,0,0,.7);transform:translateX(100%);transition:.24s cubic-bezier(.4,0,.2,1);z-index:60;display:flex;flex-direction:column}
+  .drawer.open{transform:none}
+  .d-head{padding:18px 22px;border-bottom:1px solid var(--line)}.d-close{float:right;background:none;border:none;color:var(--dim);font-size:20px;cursor:pointer;line-height:1}
+  .d-field{font-family:var(--mono);font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:var(--dim)}.d-co{font-size:19px;font-weight:700;margin:5px 0 2px}.d-val{font-size:15px;color:var(--accent);font-family:var(--mono)}
+  .d-body{padding:20px 22px;overflow-y:auto;flex:1}.d-evlabel{display:flex;align-items:center;gap:8px;font-family:var(--mono);font-size:11px;color:var(--muted);margin-bottom:12px}
+  .d-passage{background:var(--field);border:1px solid var(--line);border-left:3px solid var(--accent);border-radius:10px;padding:15px 16px;font-size:14px;line-height:1.62;color:#cdd6df}
+  .d-passage mark{background:var(--accent-soft);box-shadow:inset 0 -2px 0 var(--accent);border-radius:2px;padding:0 2px;color:#eaf2f0}
+  .d-src{margin-top:14px;display:flex;align-items:center;gap:9px;font-family:var(--mono);font-size:11.5px;color:var(--muted)}.d-src .stype{padding:2px 7px;border-radius:5px;font-size:9.5px;text-transform:uppercase}
+  .d-url{font-family:var(--mono);font-size:11px;color:var(--accent-2);word-break:break-all;margin-top:10px}
+  .d-actions{padding:16px 22px;border-top:1px solid var(--line);display:flex;gap:9px}
+  .scrim{position:fixed;inset:0;background:rgba(0,0,0,.5);opacity:0;visibility:hidden;transition:.2s;z-index:55}.scrim.on{opacity:1;visibility:visible}
+
+  /* export modal */
+  .modal{position:fixed;inset:0;display:grid;place-items:center;z-index:70;opacity:0;visibility:hidden;transition:.18s}
+  .modal.on{opacity:1;visibility:visible}
+  .modal .sheet{width:560px;max-width:92vw;background:var(--panel);border:1px solid var(--line);border-radius:16px;box-shadow:0 40px 90px -30px rgba(0,0,0,.8);overflow:hidden}
+  .modal .mh{display:flex;align-items:center;padding:16px 20px;border-bottom:1px solid var(--line)}.modal .mh h3{margin:0;font-size:15px}.modal .mh .x{margin-left:auto;background:none;border:none;color:var(--dim);font-size:18px;cursor:pointer}
+  .modal .seg{display:flex;gap:3px;background:var(--field);border:1px solid var(--line);border-radius:9px;padding:3px;margin:16px 20px 0}
+  .modal .seg button{flex:1;background:none;border:none;font-family:var(--mono);font-size:12px;color:var(--muted);padding:7px;border-radius:6px;cursor:pointer}.modal .seg button.on{background:var(--accent);color:#10211f;font-weight:700}
+  .modal pre{margin:14px 20px 20px;background:var(--field);border:1px solid var(--line);border-radius:10px;padding:14px;font-family:var(--mono);font-size:11.5px;color:#bcc6cf;overflow:auto;max-height:260px;line-height:1.6}
+  .modal .mf{padding:0 20px 20px;display:flex;gap:9px;justify-content:flex-end}
+</style>
+</head>
+<body>
+  <nav class="switch">
+    <span class="tag">NOSCIA · DESIGN</span>
+    <a href="design-1-research-console.html">01 Console</a>
+    <a href="design-2-evidence-cards.html">02 Cards</a>
+    <a class="on" href="design-3-entity-workbench.html">03 Workbench</a>
+    <a href="design-4-provenance-inspector.html">04 Provenance</a>
+    <a href="design-5-command-palette.html">05 Palette</a>
+    <a class="home" href="index.html">↩ gallery</a>
+  </nav>
+
+  <div class="qhead">
+    <div class="qtop">
+      <div class="logo">N</div>
+      <div class="qbox">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M4 6h16M4 12h16M4 18h10"/></svg>
+        <input value="FTSE 100 companies with a 2030 net-zero target and an SBTi-validated pathway, with any recent controversy" spellcheck="false">
+        <span class="mode">ENTITY SEARCH</span>
+      </div>
+    </div>
+    <div class="agentbar">
+      <div class="step done"><span class="b">✓</span>decompose</div><div class="arr"></div>
+      <div class="step done"><span class="b">✓</span>retrieve</div><div class="arr"></div>
+      <div class="step done"><span class="b">✓</span>extract</div><div class="arr"></div>
+      <div class="step now"><span class="b">↻</span>loop · pass 2</div><div class="arr"></div>
+      <div class="step"><span class="b"></span>merge</div>
+      <span class="meta">6 entities · 41 passages · 2 aliases merged</span>
+    </div>
+  </div>
+
+  <div class="body">
+    <aside class="rail">
+      <div class="rh">Websets <button title="new entity search">+</button></div>
+      <div class="wset on"><div class="t">FTSE 100 · 2030 net-zero + SBTi</div><div class="m"><span class="pill">6 rows</span><span>just now</span></div></div>
+      <div class="wset"><div class="t">EU banks with coal exit policies</div><div class="m"><span class="pill">11 rows</span><span>2d ago</span></div></div>
+      <div class="wset"><div class="t">Funds reporting under SFDR Art. 9</div><div class="m"><span class="pill">23 rows</span><span>5d ago</span></div></div>
+      <div class="wset"><div class="t">Utilities with 1.5°C-aligned capex</div><div class="m"><span class="pill">8 rows</span><span>1w ago</span></div></div>
+      <div class="rh rh2">Filter rows</div>
+      <label class="facet"><input type="checkbox" checked>Net-zero 2030<span class="n">4</span></label>
+      <label class="facet"><input type="checkbox">Net-zero 2050<span class="n">1</span></label>
+      <label class="facet"><input type="checkbox" checked>SBTi validated<span class="n">4</span></label>
+      <label class="facet"><input type="checkbox" checked>Has controversy<span class="n">3</span></label>
+      <div class="rh rh2">Evidence source</div>
+      <label class="facet"><span class="sw" style="background:var(--report)"></span>Company report<span class="n">6</span></label>
+      <label class="facet"><span class="sw" style="background:var(--ngo)"></span>SBTi / CDP<span class="n">4</span></label>
+      <label class="facet"><span class="sw" style="background:var(--ratings)"></span>Ratings<span class="n">5</span></label>
+      <label class="facet"><span class="sw" style="background:var(--news)"></span>News<span class="n">3</span></label>
+    </aside>
+
+    <div class="work">
+      <div class="tabs">
+        <button class="on" data-tab="table">⊞ Table</button>
+        <button data-tab="schema">◇ Schema</button>
+        <button data-tab="sources">⛁ Sources</button>
+        <div class="right">
+          <button class="btn">＋ column</button>
+          <button class="btn">Run another pass</button>
+          <button class="btn primary" id="exportbtn">⭳ Export</button>
+        </div>
+      </div>
+
+      <!-- TABLE -->
+      <div class="tabview on" id="tab-table">
+        <div class="legendbar">
+          <span class="count"><b>6</b> companies · <b>9</b> fields</span>
+          <span class="lg"><span><i class="ev ok"></i>cited</span><span><i class="ev est"></i>estimated</span><span><i class="ev null"></i>no evidence</span></span>
+          <span style="margin-left:auto">click any cell → cited passage</span>
+        </div>
+        <div class="scroll"><table id="grid"></table></div>
+      </div>
+
+      <!-- SCHEMA -->
+      <div class="tabview" id="tab-schema">
+        <div class="pad">
+          <h2>Extraction schema</h2>
+          <div class="sub">Declarative fields the agent fills per entity. Every field is nullable and carries an evidence link — <b style="color:var(--ink)">no field is emitted without a supporting passage.</b></div>
+          <div id="schemalist"></div>
+          <div class="addfield"><input placeholder="add field  e.g.  renewable_electricity_pct  (number · nullable · evidence-required)"><button class="btn primary">＋ Add field</button></div>
+        </div>
+      </div>
+
+      <!-- SOURCES -->
+      <div class="tabview" id="tab-sources">
+        <div class="pad">
+          <h2>Evidence sources for this Webset</h2>
+          <div class="sub">Where the 41 supporting passages came from. Live-search fallbacks are labelled.</div>
+          <table class="grid2" id="srcgrid"></table>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- drawer -->
+  <div class="scrim" id="scrim"></div>
+  <aside class="drawer" id="drawer">
+    <div class="d-head"><button class="d-close" id="dclose">✕</button><div class="d-field" id="dfield">field</div><div class="d-co" id="dco">Company</div><div class="d-val" id="dval">value</div></div>
+    <div class="d-body"><div class="d-evlabel"><i class="ev ok" id="devicon"></i><span id="devtext">explicit evidence</span></div><div class="d-passage" id="dpassage"></div><div class="d-src" id="dsrc"></div><div class="d-url" id="durl"></div></div>
+    <div class="d-actions"><button class="btn primary">⧉ Open source page</button><button class="btn">⚑ Flag value</button></div>
+  </aside>
+
+  <!-- export modal -->
+  <div class="modal" id="modal"><div class="sheet">
+    <div class="mh"><h3>Export Webset</h3><button class="x" id="mclose">✕</button></div>
+    <div class="seg"><button class="on" data-f="csv">CSV</button><button data-f="json">JSON</button></div>
+    <pre id="exportpre"></pre>
+    <div class="mf"><button class="btn" id="mcancel">Cancel</button><button class="btn primary">⭳ Download 6 rows</button></div>
+  </div></div>
+
+<script>
+const FWC={GRI:"--framework",SASB:"--framework",TCFD:"--regulator",ISSB:"--regulator",CSRD:"--ratings",CDP:"--ngo"};
+const tint=(c,a)=>`color-mix(in srgb, var(${c}) ${a}%, transparent)`;
+function c(value,ev,passage,org,stype,col,url){return{value,ev,passage,org,stype,col,url}}
+const ROWS=[
+ {co:"Unilever plc",tk:"ULVR · LSE",
+  nz:c("2030","ok",'Our <mark>Net Zero target covers our own operations by 2030</mark> and the full value chain by 2039, validated against the SBTi Net-Zero Standard.',"Climate Transition Action Plan 2025","report","--report","unilever.com/ctap-2025.pdf"),
+  sbti:c("Validated","ok",'The SBTi has <mark>validated the company\'s near- and long-term science-based targets</mark> as consistent with 1.5°C.',"SBTi Target Dashboard","ngo","--ngo","sciencebasedtargets.org/companies"),
+  s1:c("0.61 Mt","ok",'<mark>Scope 1: 0.61 MtCO₂e</mark> (market-based), down 4% YoY.',"Annual Report 2024","report","--report","unilever.com/ar-2024.pdf"),
+  s2:c("0.02 Mt","ok",'<mark>Scope 2 (market-based): 0.02 MtCO₂e</mark>, 100% renewable grid.',"Annual Report 2024","report","--report","unilever.com/ar-2024.pdf"),
+  s3:c("60.8 Mt","ok",'<mark>Scope 3: 60.8 MtCO₂e</mark>, dominated by raw materials and consumer use.',"Annual Report 2024","report","--report","unilever.com/ar-2024.pdf"),
+  fw:["GRI","SASB","TCFD","ISSB"],rating:c("AA","ok",'MSCI ESG Rating: <mark>AA (Leader)</mark>.',"MSCI ESG Ratings","ratings","--ratings","msci.com/esg-ratings"),
+  ctrv:c("Plastics pledge scaled back","est",'Reports indicated the company <mark>diluted an earlier virgin-plastic commitment</mark>, citing supply constraints. (single-source, unverified)',"ESG news wire","news","--news","esgnews.example/plastics-2026")},
+ {co:"AstraZeneca plc",tk:"AZN · LSE",
+  nz:c("2030","ok",'We aim to <mark>halve our Scope 1–3 footprint by 2030</mark> and reach net zero by 2045 under Ambition Zero Carbon.',"Sustainability Report 2024","report","--report","astrazeneca.com/sustainability.pdf"),
+  sbti:c("Validated","ok",'<mark>SBTi has validated AstraZeneca\'s net-zero science-based target</mark>.',"SBTi Target Dashboard","ngo","--ngo","sciencebasedtargets.org/companies"),
+  s1:c("0.28 Mt","ok",'<mark>Scope 1: 0.28 MtCO₂e</mark>.',"Sustainability Data Book","report","--report","astrazeneca.com/databook.pdf"),
+  s2:c("0.04 Mt","ok",'<mark>Scope 2 (market-based): 0.04 MtCO₂e</mark>.',"Sustainability Data Book","report","--report","astrazeneca.com/databook.pdf"),
+  s3:c("9.7 Mt","est",'<mark>Scope 3 estimated ~9.7 MtCO₂e</mark> via spend-based factors. (estimated)',"MSCI estimate","ratings","--ratings","msci.com/esg/methodology"),
+  fw:["GRI","TCFD","ISSB","CDP"],rating:c("AAA","ok",'MSCI ESG Rating: <mark>AAA (Leader)</mark>.',"MSCI ESG Ratings","ratings","--ratings","msci.com/esg-ratings"),
+  ctrv:c("—","null","")},
+ {co:"National Grid plc",tk:"NG · LSE",
+  nz:c("2050","ok",'Our <mark>net zero by 2050</mark> commitment, with a 2034 near-term target validated by the SBTi.',"Responsible Business Report","report","--report","nationalgrid.com/rbr.pdf"),
+  sbti:c("Validated","ok",'<mark>Near-term SBTi target validated</mark>; long-term submitted.',"SBTi Target Dashboard","ngo","--ngo","sciencebasedtargets.org/companies"),
+  s1:c("1.9 Mt","ok",'<mark>Scope 1: 1.9 MtCO₂e</mark>, largely SF₆ and gas.',"ESG Databook","report","--report","nationalgrid.com/databook.pdf"),
+  s2:c("0.7 Mt","ok",'<mark>Scope 2: 0.7 MtCO₂e</mark> (location-based).',"ESG Databook","report","--report","nationalgrid.com/databook.pdf"),
+  s3:c("4.1 Mt","ok",'<mark>Scope 3: 4.1 MtCO₂e</mark>, mainly T&D losses.',"ESG Databook","report","--report","nationalgrid.com/databook.pdf"),
+  fw:["GRI","TCFD","CSRD"],rating:c("A","est",'Sustainalytics: <mark>Medium ESG risk</mark> band. (different agency)',"Sustainalytics","ratings","--ratings","sustainalytics.com/esg-rating"),
+  ctrv:c("Grid outage inquiry","est",'A regional outage triggered a <mark>regulatory inquiry into resilience</mark>.',"Regulator notice","news","--news","ofgem.example/notice-2026")},
+ {co:"Diageo plc",tk:"DGE · LSE",
+  nz:c("2030","ok",'We target <mark>net zero across direct operations by 2030</mark> and a 50% Scope 3 cut.',"ESG Reporting Index","report","--report","diageo.com/esg-index.pdf"),
+  sbti:c("Committed","est",'Targets are <mark>submitted to the SBTi and pending validation</mark>. (committed, not yet validated)',"SBTi Target Dashboard","ngo","--ngo","sciencebasedtargets.org/companies"),
+  s1:c("0.31 Mt","ok",'<mark>Scope 1: 0.31 MtCO₂e</mark>.',"ESG Reporting Index","report","--report","diageo.com/esg-index.pdf"),
+  s2:c("0.05 Mt","ok",'<mark>Scope 2 (market-based): 0.05 MtCO₂e</mark>.',"ESG Reporting Index","report","--report","diageo.com/esg-index.pdf"),
+  s3:c("4.6 Mt","ok",'<mark>Scope 3: 4.6 MtCO₂e</mark>, packaging and agriculture.',"ESG Reporting Index","report","--report","diageo.com/esg-index.pdf"),
+  fw:["GRI","SASB","TCFD"],rating:c("AA","ok",'MSCI ESG Rating: <mark>AA</mark>.',"MSCI ESG Ratings","ratings","--ratings","msci.com/esg-ratings"),
+  ctrv:c("Water-use complaint","est",'An NGO raised a <mark>complaint over groundwater extraction</mark> near a distillery; company disputes it.',"NGO report","ngo","--ngo","ngo.example/water-2026")},
+ {co:"GSK plc",tk:"GSK · LSE",
+  nz:c("2030","ok",'Ambition for a <mark>net zero impact on climate by 2030</mark> (Scope 1&2) and climate-positive value chain by 2045.',"ESG Performance Report","report","--report","gsk.com/esg.pdf"),
+  sbti:c("Validated","ok",'<mark>SBTi-validated 1.5°C-aligned targets</mark> across scopes.',"SBTi Target Dashboard","ngo","--ngo","sciencebasedtargets.org/companies"),
+  s1:c("0.34 Mt","ok",'<mark>Scope 1: 0.34 MtCO₂e</mark>.',"ESG Performance Report","report","--report","gsk.com/esg.pdf"),
+  s2:c("0.21 Mt","ok",'<mark>Scope 2 (market-based): 0.21 MtCO₂e</mark>.',"ESG Performance Report","report","--report","gsk.com/esg.pdf"),
+  s3:c("—","null",""),fw:["GRI","TCFD","ISSB","CDP"],rating:c("AA","ok",'MSCI ESG Rating: <mark>AA</mark>.',"MSCI ESG Ratings","ratings","--ratings","msci.com/esg-ratings"),
+  ctrv:c("—","null","")},
+ {co:"Tesco plc",tk:"TSCO · LSE",
+  nz:c("2035","ok",'We target <mark>net zero in our own operations by 2035</mark> and the value chain by 2050.',"Sustainability Report 2024","report","--report","tesco.com/sustainability.pdf"),
+  sbti:c("Validated","ok",'<mark>SBTi-validated near-term and net-zero targets</mark>.',"SBTi Target Dashboard","ngo","--ngo","sciencebasedtargets.org/companies"),
+  s1:c("0.78 Mt","ok",'<mark>Scope 1: 0.78 MtCO₂e</mark>, refrigerants and fleet.',"Sustainability Report 2024","report","--report","tesco.com/sustainability.pdf"),
+  s2:c("0.0 Mt","ok",'<mark>Scope 2 (market-based): 0.0 MtCO₂e</mark> — 100% renewable.',"Sustainability Report 2024","report","--report","tesco.com/sustainability.pdf"),
+  s3:c("57.2 Mt","ok",'<mark>Scope 3: 57.2 MtCO₂e</mark>, dominated by sold products.',"Sustainability Report 2024","report","--report","tesco.com/sustainability.pdf"),
+  fw:["GRI","SASB","TCFD","CSRD"],rating:c("A","ok",'MSCI ESG Rating: <mark>A (Average)</mark>.',"MSCI ESG Ratings","ratings","--ratings","msci.com/esg-ratings"),
+  ctrv:c("Supplier labour audit","est",'Media reported <mark>labour-standard concerns at an overseas supplier</mark>; company opened an audit.',"News wire","news","--news","esgnews.example/labour-2026")}
+];
+const ev=e=>`<i class="ev ${e}"></i>`;
+const COLS=[["nz","Net-zero yr"],["sbti","SBTi"],["s1","Scope 1"],["s2","Scope 2"],["s3","Scope 3"],["fw","Frameworks"],["rating","ESG rating"],["ctrv","Recent controversy"]];
+function cellHTML(d,f){
+  if(f==='fw')return `<div class="cell" data-co="${d.co}" data-f="fw"><div class="fw">${d.fw.map(x=>`<b style="color:var(${FWC[x]});background:${tint(FWC[x],14)}">${x}</b>`).join('')}</div></div>`;
+  const o=d[f];let inner;
+  if(f==='sbti')inner=`<span class="pill ${/Valid/.test(o.value)?'yes':'no'}">${o.value}</span>`;
+  else if(f==='rating')inner=`<span class="rating" style="color:var(--ratings);background:${tint('--ratings',14)}">${o.value}</span>`;
+  else if(f==='ctrv')inner=`<span class="val ${o.ev==='null'?'null':'ctrv'}">${o.value}</span>`;
+  else inner=`<span class="val ${o.ev==='null'?'null':''}">${o.value}</span>`;
+  return `<div class="cell" data-co="${d.co}" data-f="${f}">${ev(o.ev==='null'?'null':o.ev)}${inner}</div>`;
+}
+document.getElementById('grid').innerHTML=
+ `<thead><tr><th>Company</th>${COLS.map(c=>`<th>${c[1]}</th>`).join('')}</tr></thead><tbody>`+
+ ROWS.map(d=>`<tr><td><div class="cell company" data-co="${d.co}" data-f="co">${d.co}<small>${d.tk}</small></div></td>${COLS.map(c=>`<td>${cellHTML(d,c[0])}</td>`).join('')}</tr>`).join('')+`</tbody>`;
+
+/* tabs */
+document.querySelectorAll('.tabs button[data-tab]').forEach(b=>b.onclick=()=>{
+  document.querySelectorAll('.tabs button[data-tab]').forEach(x=>x.classList.remove('on'));b.classList.add('on');
+  document.querySelectorAll('.tabview').forEach(v=>v.classList.toggle('on',v.id==='tab-'+b.dataset.tab));
+});
+/* websets */
+document.querySelectorAll('.wset').forEach(w=>w.onclick=()=>{document.querySelectorAll('.wset').forEach(x=>x.classList.remove('on'));w.classList.add('on')});
+
+/* schema list */
+const SCHEMA=[["company_name","entity identifier","string","required"],["net_zero_target_year","year of net-zero commitment","number",""],["sbti_validated","SBTi pathway status","enum",""],["scope1_emissions","value + unit + year","measure",""],["scope2_emissions","value + unit + year","measure",""],["scope3_emissions","value + unit + year","measure",""],["frameworks_reported","GRI / SASB / TCFD / ISSB …","list",""],["esg_rating","value + agency","measure",""],["notable_controversies","date + source each","list",""],["surface_forms","name variants","list",""],["aliases","merge keys","list",""]];
+document.getElementById('schemalist').innerHTML=SCHEMA.map(s=>`<div class="field"><span class="grip">⋮⋮</span><div><div class="fn">${s[0]} ${s[3]?'<span class="req">· required</span>':''}</div><div class="ft">${s[1]}</div></div><span class="typ">${s[2]}</span><button class="x">✕</button></div>`).join('');
+
+/* sources grid */
+const SRC=[["Company sustainability reports","report","--report",6,"indexed","direct disclosure"],["SBTi Target Dashboard","ngo","--ngo",6,"indexed","validation status"],["MSCI / Sustainalytics","ratings","--ratings",5,"indexed","ratings + estimates"],["ESG news wire","news","--news",3,"live fallback","controversy flags"],["Regulator notices","news","--news",1,"live fallback","governance events"]];
+document.getElementById('srcgrid').innerHTML=`<thead><tr><th>Source</th><th>Type</th><th>Passages</th><th>Mode</th><th>Provides</th></tr></thead><tbody>`+SRC.map(s=>`<tr><td style="font-weight:600">${s[0]}</td><td><span class="dot" style="background:var(${s[2]})"></span><span style="font-family:var(--mono);font-size:11px;color:var(${s[2]})">${s[1]}</span></td><td style="font-family:var(--mono)">${s[3]}</td><td><span style="font-family:var(--mono);font-size:11px;color:${s[4]==='live fallback'?'var(--est)':'var(--ok)'}">${s[4]==='live fallback'?'◇ '+s[4]:'● '+s[4]}</span></td><td style="color:var(--muted);font-size:12px">${s[5]}</td></tr>`).join('')+`</tbody>`;
+
+/* drawer */
+const FL={nz:"net-zero target year",sbti:"SBTi pathway status",s1:"Scope 1 emissions",s2:"Scope 2 emissions",s3:"Scope 3 emissions",rating:"ESG rating",ctrv:"recent controversy"};
+const drawer=document.getElementById('drawer'),scrim=document.getElementById('scrim');
+function openDrawer(co,f){
+  if(f==='co'||f==='fw')return;const d=ROWS.find(r=>r.co===co),o=d[f];
+  document.querySelectorAll('.cell').forEach(x=>x.classList.remove('sel'));
+  document.querySelector(`.cell[data-co="${co}"][data-f="${f}"]`)?.classList.add('sel');
+  document.getElementById('dfield').textContent=FL[f]||f;document.getElementById('dco').textContent=d.co;document.getElementById('dval').textContent=o.value;
+  const icon=document.getElementById('devicon'),text=document.getElementById('devtext');icon.className=`ev ${o.ev}`;
+  text.textContent=o.ev==='ok'?'explicit evidence · cited passage':o.ev==='est'?'estimated / single-source — treat with caution':'no supporting passage — value left null';
+  const pass=document.getElementById('dpassage'),src=document.getElementById('dsrc'),url=document.getElementById('durl');
+  if(o.ev==='null'||!o.passage){pass.innerHTML=`<span style="color:var(--null);font-style:italic">No passage in the index supports a value here. Per evidence-or-null, the cell is left blank rather than guessed.</span>`;src.innerHTML='';url.textContent='';}
+  else{pass.innerHTML=o.passage;src.innerHTML=`<span class="stype" style="color:var(${o.col});background:${tint(o.col,14)}">${o.stype}</span><b style="color:var(--ink);font-weight:600">${o.org}</b>`;url.textContent=o.url;}
+  drawer.classList.add('open');scrim.classList.add('on');
+}
+function closeDrawer(){drawer.classList.remove('open');scrim.classList.remove('on');document.querySelectorAll('.cell').forEach(x=>x.classList.remove('sel'))}
+document.querySelectorAll('.cell').forEach(c=>c.onclick=()=>openDrawer(c.dataset.co,c.dataset.f));
+document.getElementById('dclose').onclick=closeDrawer;scrim.onclick=closeDrawer;
+
+/* export modal */
+const modal=document.getElementById('modal');
+const csv="company,net_zero_year,sbti,scope1_mt,scope2_mt,scope3_mt,esg_rating,controversy\n"+ROWS.map(d=>`${d.co},${d.nz.value},${d.sbti.value},${d.s1.value.replace(' Mt','')},${d.s2.value.replace(' Mt','')},${d.s3.value.replace(' Mt','')},${d.rating.value},"${d.ctrv.value}"`).join("\n");
+const json=JSON.stringify(ROWS.slice(0,2).map(d=>({company:d.co,net_zero_year:+d.nz.value||d.nz.value,sbti_validated:d.sbti.value,scope3_mt:d.s3.value,esg_rating:{value:d.rating.value,agency:"MSCI"},_evidence:{net_zero:d.nz.url}})),null,2)+"\n  … 4 more rows";
+function showExport(f){document.getElementById('exportpre').textContent=f==='csv'?csv:json;}
+document.getElementById('exportbtn').onclick=()=>{modal.classList.add('on');showExport('csv');};
+document.getElementById('mclose').onclick=()=>modal.classList.remove('on');
+document.getElementById('mcancel').onclick=()=>modal.classList.remove('on');
+document.querySelectorAll('.modal .seg button').forEach(b=>b.onclick=()=>{document.querySelectorAll('.modal .seg button').forEach(x=>x.classList.remove('on'));b.classList.add('on');showExport(b.dataset.f);});
+document.addEventListener('keydown',e=>{if(e.key==='Escape'){closeDrawer();modal.classList.remove('on');}});
+</script>
+</body>
+</html>

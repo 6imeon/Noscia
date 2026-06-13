@@ -1,0 +1,35 @@
+# secrets — never commit (see IMPLEMENTATION §9: .env holds the demo provider key)
+.env
+.env.*
+!.env.example
+
+# python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+.uv/
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+
+# node / pnpm
+node_modules/
+.pnpm-store/
+dist/
+build/
+*.tsbuildinfo
+
+# data, index, model caches (local-first artifacts)
+data/
+*.lance/
+.cache/
+models/
+*.safetensors
+*.gguf
+
+# os / editor
+.DS_Store
+.idea/
+.vscode/
+*.log
