@@ -42,11 +42,11 @@ now a **site section**, not one page.
   authoritative org that answers it, and any page of that domain counts (deduped to its best
   rank per domain). Deep-crawl sub-pages and recrawl URL churn no longer perturb rule 9's gate.
   The existing `esg_queries.jsonl` labels stayed valid by construction (domains unchanged).
-- **Corpus at end of phase 2.5: 581 pages / 4,925 chunks across 21 sources** (8 → 21 domains;
-  34 MB index) — includes the PDF documents and URL-deduplication below. Eval **Quality**
-  nDCG@10 0.914 · MRR 0.933 · Recall@10 0.911; **Fast** 0.881 · 0.900 · 0.911. The gate
-  **de-saturated** (was ≈0.99/1.000 on the 8-doc corpus) — there's now measurable headroom,
-  so a fine-tune *could* show a win and rule 9 can discriminate again.
+- **Corpus at end of phase 2.5: 581 pages / 4,817 chunks across 21 sources** (8 → 21 domains;
+  41 MB index) — includes the PDF documents (reflowed to prose) and URL-deduplication below.
+  Eval **Quality** nDCG@10 0.918 · MRR 0.933 · Recall@10 0.911; **Fast** 0.881 · 0.900 · 0.911.
+  The gate **de-saturated** (was ≈0.99/1.000 on the 8-doc corpus) — there's now measurable
+  headroom, so a fine-tune *could* show a win and rule 9 can discriminate again.
 
 ### PDF extraction — the substance HTML crawling misses (`ingest/pdf.py`, `pypdf` 6.13.0)
 - Some authoritative domains publish their real content as **PDFs**, not HTML — TCFD's
@@ -62,7 +62,7 @@ now a **site section**, not one page.
   discovery could see them, so an allow-listed external host (`assets.bbhub.io`) was invisible
   even though same-domain PDFs worked. Fixed by keeping external links in `result.links`
   (markdown stays link-free via the generator; BFS scope is still bounded by `include_external`).
-  Net: **45 PDF documents / 2,394 chunks** indexed — TCFD went from 1 thin landing page to its
+  Net: **44 PDF documents / 2,205 chunks** indexed — TCFD went from 1 thin landing page to its
   full 2017 recommendations report.
 
 ### URL canonicalization — no more `?page=1` duplicate results (`ingest/url.py`)
@@ -72,6 +72,25 @@ now a **site section**, not one page.
   gets its URL: lowercase host, drop fragment + tracking + first-page pagination, strip trailing
   slash, sort surviving params. Conservative — `?page=2` and unknown params are preserved.
   After re-ingest the corpus holds **0** `?page=1`/`?paged=1` duplicate result URLs (was 64).
+- Follow-up: the `_gl` / `_gac` / `_gcl_*` Google-Analytics linker family leaked into Ceres
+  and Sustainalytics PDF citation URLs (it isn't `utm_*`); added it to the strip list.
+
+### Result readability — clean PDF prose + an Exa-style answer layer
+- `pypdf` emits *layout-faithful* text: a page's columns, wrapped lines and table rows
+  all arrive split by `\n`, so PDF passages read as fragmented soup and the
+  sentence-window highlighter couldn't form a clean excerpt (it hard-truncated with `…`).
+  `pdf.py::_clean_pdf_text` reflows it to prose — rejoin soft-wrapped lines, keep
+  paragraph breaks, keep hyphens at wraps (ESG is dense with real compounds like
+  *climate-related*; merging them would be worse than the rare syllable artifact). The
+  highlighter also now treats hard line breaks as sentence boundaries.
+- **Per-result summary (`search/summarize.py`)** — an opt-in, BYOK answer layer in the
+  spirit of Exa's `summary`: for the top results, an LLM distills *that result's own
+  passage* into a 1–2 sentence answer to the user's query. Grounded, never freelance
+  (rule 8) — the model answers only from the passage and returns `NONE` (→ null) when the
+  passage doesn't address the query. BYOK via `get_secret` (no key ⇒ no summaries, no
+  error); summaries run concurrently, capped to the top few for latency. Contract grew
+  `SearchRequest.summarize` + `SearchResult.summary` + `SearchResponse.summarized`; the UI
+  adds a key-gated **✦ AI answers** toggle and renders the answer above the cited passage.
 
 ## Phase 2 — Quality + freshness — 2026-06-14
 

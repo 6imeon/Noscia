@@ -70,9 +70,38 @@ def health() -> HealthResponse:
 
 
 @app.post("/search", response_model=SearchResponse)
-def search(req: SearchRequest) -> SearchResponse:
+async def search(req: SearchRequest) -> SearchResponse:
     # embed → (hybrid+rerank | dense) → highlight. See search/pipeline.py.
-    return run_search(req)
+    resp = run_search(req)
+    if req.summarize:
+        resp = await _attach_summaries(req.query, resp)
+    return resp
+
+
+async def _attach_summaries(query: str, resp: SearchResponse) -> SearchResponse:
+    """BYOK, opt-in: synthesize a query-focused answer for the top results.
+
+    Grounds each summary in that result's own best passage (the highlight, marks
+    stripped). No key configured ⇒ summaries stay null and ``summarized`` is False, so
+    the UI falls back to the cited passage rather than erroring. See search/summarize.py.
+    """
+    from .search import summarize as summ
+
+    top = resp.results[: summ.DEFAULT_TOP_N]
+    passages = [_passage_text(r.highlight) for r in top]
+    summaries = await summ.summarize(query, passages)
+    for r, s in zip(top, summaries, strict=True):
+        r.summary = s
+    resp.summarized = bool(get_secret("openrouter"))
+    return resp
+
+
+def _passage_text(highlight: str) -> str:
+    """The plain-text passage behind a highlight — drop <mark> spans, unescape entities."""
+    import html
+    import re
+
+    return html.unescape(re.sub(r"</?mark>", "", highlight))
 
 
 @app.get("/corpus", response_model=CorpusResponse)

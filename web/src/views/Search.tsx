@@ -1,7 +1,7 @@
 // Search view (Phase 1 primary, SPEC §8.4): shared search bar + Quality/Fast
 // toggle → result list (badge/score/snippet) + passage reader. Selecting a row
 // opens its cited passage in the reader. Empty/loading/error/done states.
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { api, type SearchResponse, type SearchResult, type Tier } from '../lib/api'
 import { PassageReader } from '../components/PassageReader'
 import { ResultRow } from '../components/ResultRow'
@@ -16,15 +16,25 @@ type Status =
 export function Search() {
   const [query, setQuery] = useState('')
   const [tier, setTier] = useState<Tier>('quality')
+  const [summarize, setSummarize] = useState(false)
+  const [keyConfigured, setKeyConfigured] = useState(false)
   const [status, setStatus] = useState<Status>({ kind: 'idle' })
   const [selected, setSelected] = useState<SearchResult | null>(null)
+
+  // BYOK summaries need a reasoning key — gate the toggle on /providers status.
+  useEffect(() => {
+    api
+      .providers()
+      .then((p) => setKeyConfigured(p.providers.some((k) => k.configured)))
+      .catch(() => setKeyConfigured(false))
+  }, [])
 
   const run = async () => {
     if (!query.trim()) return
     setStatus({ kind: 'loading' })
     setSelected(null)
     try {
-      const data = await api.search({ query, tier })
+      const data = await api.search({ query, tier, summarize: summarize && keyConfigured })
       setStatus({ kind: 'done', data })
       setSelected(data.results[0] ?? null)
     } catch (e) {
@@ -41,6 +51,9 @@ export function Search() {
           onSubmit={run}
           tier={tier}
           onTier={setTier}
+          summarize={summarize}
+          onSummarize={setSummarize}
+          summarizeAvailable={keyConfigured}
           busy={status.kind === 'loading'}
         />
       </div>

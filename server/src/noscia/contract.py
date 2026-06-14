@@ -30,6 +30,9 @@ class SearchRequest(BaseModel):
     query: str = Field(min_length=1)
     tier: Tier = "quality"
     top_k: int = Field(default=20, ge=1, le=100)
+    # Opt-in, BYOK: synthesize a query-focused answer per top result. Silently
+    # ignored (summaries stay null) when no reasoning key is configured.
+    summarize: bool = False
 
 
 class PipelineTrace(BaseModel):
@@ -51,6 +54,7 @@ class SearchResult(BaseModel):
     score: float
     highlight: str  # best-matching passage; may contain <mark>…</mark> spans
     fresh: bool = False
+    summary: str | None = None  # BYOK query-focused answer (only when `summarize` asked)
 
 
 class SearchResponse(BaseModel):
@@ -58,6 +62,7 @@ class SearchResponse(BaseModel):
     tier: Tier
     results: list[SearchResult]
     trace: PipelineTrace
+    summarized: bool = False  # AI summaries actually ran (a reasoning key was configured)
 
 
 # --- /corpus (index stats + sources; Corpus view §8.4) -------------------

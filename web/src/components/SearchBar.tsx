@@ -7,6 +7,9 @@ export function SearchBar({
   onSubmit,
   tier,
   onTier,
+  summarize = false,
+  onSummarize,
+  summarizeAvailable = false,
   placeholder = 'Search the ESG corpus…',
   busy = false,
 }: {
@@ -15,6 +18,9 @@ export function SearchBar({
   onSubmit: () => void
   tier: Tier
   onTier: (t: Tier) => void
+  summarize?: boolean
+  onSummarize?: (v: boolean) => void
+  summarizeAvailable?: boolean
   placeholder?: string
   busy?: boolean
 }) {
@@ -34,6 +40,26 @@ export function SearchBar({
           className="w-full rounded-md border border-line bg-field px-3 py-2 text-sm text-ink placeholder:text-dim focus:border-accent focus:outline-none"
         />
       </form>
+      {onSummarize && (
+        <button
+          type="button"
+          disabled={busy || !summarizeAvailable}
+          onClick={() => onSummarize(!summarize)}
+          title={
+            summarizeAvailable
+              ? 'Synthesize a query-focused answer per result (BYOK)'
+              : 'Add a reasoning key in Settings · BYOK to enable AI answers'
+          }
+          className={`rounded-md border px-3 py-2 font-mono text-xs transition-colors disabled:opacity-40 ${
+            summarize && summarizeAvailable
+              ? 'border-accent text-bg'
+              : 'border-line text-muted hover:bg-hover'
+          }`}
+          style={summarize && summarizeAvailable ? { background: 'var(--color-accent)' } : undefined}
+        >
+          ✦ AI answers
+        </button>
+      )}
       <TierToggle tier={tier} onTier={onTier} disabled={busy} />
     </div>
   )

@@ -19,6 +19,9 @@ export interface SearchRequest {
   query: string
   tier: Tier
   top_k?: number
+  // Opt-in, BYOK: synthesize a query-focused answer per top result. Ignored
+  // (summaries stay null) when no reasoning key is configured.
+  summarize?: boolean
 }
 
 export interface PipelineTrace {
@@ -37,6 +40,7 @@ export interface SearchResult {
   score: number
   highlight: string
   fresh: boolean
+  summary?: string | null
 }
 
 export interface SearchResponse {
@@ -44,6 +48,7 @@ export interface SearchResponse {
   tier: Tier
   results: SearchResult[]
   trace: PipelineTrace
+  summarized?: boolean
 }
 
 export interface ProviderKeyStatus {

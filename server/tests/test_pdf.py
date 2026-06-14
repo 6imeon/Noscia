@@ -3,7 +3,7 @@
 from types import SimpleNamespace
 
 from noscia.ingest.crawl import _collect_pdf_urls
-from noscia.ingest.pdf import _filename_title
+from noscia.ingest.pdf import _clean_pdf_text, _filename_title
 
 
 def _result(*hrefs, kind="internal"):
@@ -13,6 +13,23 @@ def _result(*hrefs, kind="internal"):
 def test_filename_title_humanizes_when_no_metadata():
     url = "https://assets.bbhub.io/company/sites/60/2021/10/FINAL-2017-TCFD-Report.pdf"
     assert _filename_title(url) == "FINAL 2017 TCFD Report"
+
+
+def test_clean_pdf_text_reflows_wraps_keeps_paragraphs():
+    raw = (
+        "The Task Force on Climate-\nrelated Financial\nDisclosures recommends"
+        "\n\nFour core elements:"
+    )
+    out = _clean_pdf_text(raw)
+    # hyphenated wrap rejoined (hyphen kept), lone newlines became spaces…
+    assert "Climate-related Financial Disclosures recommends" in out
+    # …but the blank-line paragraph break survives
+    assert "recommends\n\nFour core elements:" in out
+    assert "  " not in out  # no double spaces left behind
+
+
+def test_clean_pdf_text_empty_is_empty():
+    assert _clean_pdf_text("   \n  \n ") == ""
 
 
 def test_collect_same_site_pdfs_only_by_default():

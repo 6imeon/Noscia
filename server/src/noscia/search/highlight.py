@@ -29,7 +29,10 @@ def _terms(query: str) -> list[str]:
 
 
 def _sentences(text: str) -> list[str]:
-    parts = re.split(r"(?<=[.!?])\s+", text.strip())
+    # Split on sentence enders *and* hard line breaks: PDF-derived passages can carry
+    # residual newlines between list items / headings that aren't `.!?`-terminated, and
+    # without this the window grows into one giant pseudo-sentence and gets hard-truncated.
+    parts = re.split(r"(?<=[.!?])\s+|\n+", text.strip())
     return [p.strip() for p in parts if p.strip()]
 
 

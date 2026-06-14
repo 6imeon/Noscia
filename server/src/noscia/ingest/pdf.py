@@ -16,6 +16,7 @@ page, never a raised exception that sinks the seed.
 from __future__ import annotations
 
 import io
+import re
 
 from .crawl import _UA, CrawledPage
 
@@ -35,8 +36,32 @@ def _filename_title(url: str) -> str:
     return name.replace("-", " ").replace("_", " ").strip() or url
 
 
+def _clean_pdf_text(text: str) -> str:
+    """Reflow ``pypdf``'s layout-faithful output into reading prose.
+
+    ``extract_text`` preserves every visual line break — a page's columns, wrapped
+    lines, and table rows all arrive split by ``\\n``. Left alone that reads as
+    fragmented soup (and the sentence-window highlighter can't form a clean passage
+    from it). We rejoin soft-wrapped lines into sentences while keeping paragraph
+    breaks:
+      * a hyphen at a line wrap keeps the hyphen but loses the break — ESG text is
+        dense with real compounds (``climate-related``, ``science-based``); merging
+        ``climate-\\nrelated`` to ``climaterelated`` would be worse than the rare
+        syllable-break artifact (``compre-hensive``) keeping it produces;
+      * a single newline is a wrap → becomes a space (flowing prose);
+      * a blank line is a real paragraph break → preserved.
+    """
+    text = text.replace("\r\n", "\n").replace("\r", "\n")
+    text = re.sub(r"-\n(?=\w)", "-", text)  # wrapped word: keep hyphen, drop the break
+    text = re.sub(r"[ \t]*\n[ \t]*", "\n", text)  # strip spaces hugging newlines
+    text = re.sub(r"(?<!\n)\n(?!\n)", " ", text)  # lone newline → space (rejoin wraps)
+    text = re.sub(r"\n{3,}", "\n\n", text)  # cap paragraph gaps at one blank line
+    text = re.sub(r"[ \t]{2,}", " ", text)  # collapse runs of spaces
+    return text.strip()
+
+
 def _extract_text(data: bytes) -> tuple[str, str | None]:
-    """``(text, pdf_title)`` from PDF bytes via pypdf. Page text joined by blank lines."""
+    """``(text, pdf_title)`` from PDF bytes via pypdf. Page text reflowed to prose."""
     from pypdf import PdfReader
     from pypdf.errors import PdfReadError
 
@@ -55,12 +80,14 @@ def _extract_text(data: bytes) -> tuple[str, str | None]:
     pages: list[str] = []
     for page in reader.pages:
         try:
-            pages.append(page.extract_text() or "")
+            cleaned = _clean_pdf_text(page.extract_text() or "")
         except Exception:  # noqa: BLE001 — one bad page shouldn't drop the document
             continue
+        if cleaned:
+            pages.append(cleaned)
     meta = reader.metadata or {}
     pdf_title = (getattr(meta, "title", None) or "").strip() or None
-    return "\n\n".join(p.strip() for p in pages if p.strip()), pdf_title
+    return "\n\n".join(pages), pdf_title
 
 
 async def extract_pdf(url: str, *, max_bytes: int = _MAX_PDF_BYTES) -> CrawledPage:
