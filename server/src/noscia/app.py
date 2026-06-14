@@ -100,24 +100,24 @@ async def search(req: SearchRequest) -> SearchResponse:
     # embed → (hybrid+rerank | dense) → highlight. See search/pipeline.py.
     resp = run_search(req)
     if req.summarize:
-        resp = await _attach_summaries(req.query, resp)
+        resp = await _attach_answer(req.query, resp)
     return resp
 
 
-async def _attach_summaries(query: str, resp: SearchResponse) -> SearchResponse:
-    """BYOK, opt-in: synthesize a query-focused answer for the top results.
+async def _attach_answer(query: str, resp: SearchResponse) -> SearchResponse:
+    """BYOK, opt-in: synthesize one grounded answer over the top results' passages.
 
-    Grounds each summary in that result's own best passage (the highlight, marks
-    stripped). No key configured ⇒ summaries stay null and ``summarized`` is False, so
-    the UI falls back to the cited passage rather than erroring. See search/summarize.py.
+    Sees the top passages together (the answer is often split across them), cites the
+    rows it used, and stays honest — null when the corpus doesn't answer (rule 8). No
+    key configured ⇒ answer null and ``summarized`` False, so the UI falls back to the
+    cited passages rather than erroring. See search/summarize.py.
     """
     from .search import summarize as summ
 
-    top = resp.results[: summ.DEFAULT_TOP_N]
-    passages = [_passage_text(r.highlight) for r in top]
-    summaries = await summ.summarize(query, passages)
-    for r, s in zip(top, summaries, strict=True):
-        r.summary = s
+    passages = [_passage_text(r.highlight) for r in resp.results[: summ.DEFAULT_TOP_N]]
+    answer, citations = await summ.synthesize_answer(query, passages)
+    resp.answer = answer
+    resp.answer_citations = citations
     resp.summarized = bool(get_secret("openrouter"))
     return resp
 

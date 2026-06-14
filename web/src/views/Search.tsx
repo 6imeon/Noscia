@@ -3,6 +3,7 @@
 // opens its cited passage in the reader. Empty/loading/error/done states.
 import { useEffect, useState } from 'react'
 import { api, type SearchResponse, type SearchResult, type Tier } from '../lib/api'
+import { AnswerBanner } from '../components/AnswerBanner'
 import { PassageReader } from '../components/PassageReader'
 import { ResultRow } from '../components/ResultRow'
 import { SearchBar } from '../components/SearchBar'
@@ -16,7 +17,7 @@ type Status =
 export function Search() {
   const [query, setQuery] = useState('')
   const [tier, setTier] = useState<Tier>('quality')
-  const [summarize, setSummarize] = useState(false)
+  const [summarize, setSummarize] = useState(true) // on by default; only sent when a key exists
   const [keyConfigured, setKeyConfigured] = useState(false)
   const [status, setStatus] = useState<Status>({ kind: 'idle' })
   const [selected, setSelected] = useState<SearchResult | null>(null)
@@ -57,6 +58,8 @@ export function Search() {
           busy={status.kind === 'loading'}
         />
       </div>
+
+      {status.kind === 'done' && <AnswerBanner data={status.data} onSelect={setSelected} />}
 
       <div className="grid min-h-0 flex-1 grid-cols-[minmax(0,1fr)_minmax(0,1.4fr)]">
         <section className="min-h-0 overflow-auto border-r border-line">

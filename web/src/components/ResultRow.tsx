@@ -41,12 +41,6 @@ export function ResultRow({
         {result.org ? `${result.org} · ` : ''}
         {host(result.url)}
       </div>
-      {result.summary && (
-        <p className="mt-1.5 line-clamp-2 text-xs leading-relaxed text-ink">
-          <span className="mr-1 font-mono text-[10px] text-accent">✦</span>
-          {result.summary}
-        </p>
-      )}
       <p
         className="mt-1.5 line-clamp-2 text-xs leading-relaxed text-muted"
         dangerouslySetInnerHTML={{ __html: result.highlight }}

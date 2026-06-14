@@ -69,15 +69,6 @@ export function PassageReader({ result }: { result: SearchResult | null }) {
       </div>
 
       <article className="min-h-0 flex-1 overflow-auto px-6 py-5">
-        {result.summary && (
-          <div className="mb-4 rounded-md border border-accent/40 bg-accent/5 px-4 py-3">
-            <div className="mb-1 flex items-center gap-1.5 font-mono text-[10px] uppercase tracking-wide text-accent">
-              ✦ AI answer
-              <span className="text-dim normal-case tracking-normal">· grounded in this passage</span>
-            </div>
-            <p className="text-sm leading-6 text-ink">{result.summary}</p>
-          </div>
-        )}
         <p
           className="text-sm leading-7 text-ink"
           dangerouslySetInnerHTML={{ __html: body }}

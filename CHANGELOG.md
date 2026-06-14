@@ -83,14 +83,18 @@ now a **site section**, not one page.
   paragraph breaks, keep hyphens at wraps (ESG is dense with real compounds like
   *climate-related*; merging them would be worse than the rare syllable artifact). The
   highlighter also now treats hard line breaks as sentence boundaries.
-- **Per-result summary (`search/summarize.py`)** — an opt-in, BYOK answer layer in the
-  spirit of Exa's `summary`: for the top results, an LLM distills *that result's own
-  passage* into a 1–2 sentence answer to the user's query. Grounded, never freelance
-  (rule 8) — the model answers only from the passage and returns `NONE` (→ null) when the
-  passage doesn't address the query. BYOK via `get_secret` (no key ⇒ no summaries, no
-  error); summaries run concurrently, capped to the top few for latency. Contract grew
-  `SearchRequest.summarize` + `SearchResult.summary` + `SearchResponse.summarized`; the UI
-  adds a key-gated **✦ AI answers** toggle and renders the answer above the cited passage.
+- **Synthesized answer (`search/summarize.py`)** — an opt-in, BYOK answer layer in the
+  spirit of Exa's/Perplexity's answer: a *single* LLM call over the top passages
+  synthesizes one direct, 2–4 sentence answer to the query, with inline `[n]` citations
+  back to the result rows it used. One answer over all top passages (not per-result), so
+  an answer split across several rows still comes together — and the user sees it once, up
+  top, instead of hunting for the row that happens to contain it. Grounded, never freelance
+  (rule 8): answers only from the retrieved passages, returns `NONE` (→ null, shown as an
+  honest "no direct answer in the corpus") when they don't contain it. BYOK via `get_secret`
+  (no key ⇒ no answer, no error). Contract grew `SearchRequest.summarize` +
+  `SearchResponse.answer` / `answer_citations` / `summarized`; the UI adds a key-gated
+  **✦ AI answers** toggle (on by default when a key is present) and an answer banner above
+  the results whose `[n]` chips jump to the cited passage.
 - **Model pre-warm (`app.py` lifespan)** — the embedder + cross-encoder are lazy +
   `lru_cache`'d, so the *first* search used to pay the full ≈1 GB cold-start (minutes on
   CPU). A daemon thread now loads them at boot (off the request path; boot stays instant,

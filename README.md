@@ -19,8 +19,8 @@ where the substance lives there, not in HTML — TCFD reports, EFRAG/GRI guidanc
 the seed's own domain or an operator-approved publications CDN, never the open web),
 **incremental crawl** (HTTP 304 + content-hash diff + page-level prune, adaptive
 cadence), **URL canonicalization** (cosmetic `?page=1`/tracking variants folded so results
-don't duplicate), an optional **BYOK answer layer** (a query-focused summary grounded in each
-result's own passage — never the open web), and a LoRA **fine-tune pipeline** that runs locally and is honestly eval-gated.
+don't duplicate), an optional **BYOK answer layer** (one query-focused answer synthesized over the
+retrieved passages, with citations — grounded in the index, never the open web), and a LoRA **fine-tune pipeline** that runs locally and is honestly eval-gated.
 Search is **index-only**: no third-party search providers, no external data egress —
 depth comes from crawling our 21 curated authoritative domains, never the open web (rule 13).
 Phase 1 (core ESG search) — crawl → index → hybrid → rerank → highlighted, cited results —
