@@ -7,6 +7,8 @@ before the pipeline exists.
 
 from __future__ import annotations
 
+import os
+import threading
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 from importlib.metadata import version as pkg_version
@@ -42,6 +44,26 @@ except Exception:  # not installed as a dist (e.g. some test runners)
 # in web/vite.config.ts to avoid the crowded 5173 default.
 DEV_ORIGINS = ["http://localhost:5180", "http://127.0.0.1:5180"]
 
+def _prewarm_models() -> None:
+    """Load the embedder + cross-encoder off the request path (see search/embed.py,
+    rerank.py). The models are lazy + ``lru_cache``'d, so without this the *first*
+    search pays the full ≈1 GB cold-start (minutes on CPU). Loading them here at boot
+    moves that cost off the user's first query. Best-effort: a missing model cache
+    logs and returns — it must never crash the API."""
+    import time
+
+    from .search import embed, rerank
+
+    t0 = time.perf_counter()
+    try:
+        embed.warm()
+        rerank.warm()
+    except Exception as exc:  # noqa: BLE001 — warmup is best-effort, never fatal
+        print(f"[prewarm] search models failed to load: {type(exc).__name__}: {exc}")
+        return
+    print(f"[prewarm] search models ready in {time.perf_counter() - t0:.0f}s")
+
+
 @asynccontextmanager
 async def lifespan(_app: FastAPI) -> AsyncIterator[None]:
     # Idempotent: ensure the schema exists and seeds are registered for the
@@ -51,6 +73,10 @@ async def lifespan(_app: FastAPI) -> AsyncIterator[None]:
         ingest.register_seeds()
     except Exception:  # a missing DB shouldn't stop the API from booting
         pass
+    # Warm the search models in the background so boot stays instant and the first
+    # search is as fast as the rest. Skipped under pytest (tests never load models).
+    if not os.environ.get("PYTEST_CURRENT_TEST"):
+        threading.Thread(target=_prewarm_models, name="model-prewarm", daemon=True).start()
     yield
 
 

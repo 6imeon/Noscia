@@ -91,6 +91,13 @@ now a **site section**, not one page.
   error); summaries run concurrently, capped to the top few for latency. Contract grew
   `SearchRequest.summarize` + `SearchResult.summary` + `SearchResponse.summarized`; the UI
   adds a key-gated **✦ AI answers** toggle and renders the answer above the cited passage.
+- **Model pre-warm (`app.py` lifespan)** — the embedder + cross-encoder are lazy +
+  `lru_cache`'d, so the *first* search used to pay the full ≈1 GB cold-start (minutes on
+  CPU). A daemon thread now loads them at boot (off the request path; boot stays instant,
+  skipped under pytest) so the first search is as fast as the rest. Remaining latency is
+  pure inference: warm, fast tier ≈1 s / quality ≈9 s on host MPS, vs ≈4 s / ≈52 s in the
+  CPU-only Docker container (Docker on macOS can't reach Metal) — for a snappy dev loop run
+  the API natively on the host (`docker compose up postgres` + host `uvicorn`).
 
 ## Phase 2 — Quality + freshness — 2026-06-14
 
