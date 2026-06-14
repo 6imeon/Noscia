@@ -17,9 +17,13 @@ from __future__ import annotations
 from urllib.parse import parse_qsl, urlencode, urlsplit, urlunsplit
 
 # Query params that never affect the rendered content — analytics/click decoration.
-_TRACKING_PREFIXES = ("utm_",)
+# Prefixes cover families: utm_* campaign tags and Google's _gcl_* cross-domain linkers.
+_TRACKING_PREFIXES = ("utm_", "_gcl")
 _TRACKING_KEYS = frozenset(
-    {"gclid", "fbclid", "mc_cid", "mc_eid", "_ga", "ref", "ref_src", "igshid", "yclid"}
+    {
+        "gclid", "fbclid", "mc_cid", "mc_eid", "ref", "ref_src", "igshid", "yclid",
+        "_ga", "_gl", "_gac",  # Google Analytics linker / measurement params
+    }
 )
 # Pagination params whose first-page value is identical to the bare URL.
 _PAGE_KEYS = frozenset({"page", "paged", "pg"})

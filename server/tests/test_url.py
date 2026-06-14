@@ -25,6 +25,16 @@ def test_tracking_params_dropped_real_params_kept_and_sorted():
     assert "id=7" in canonical_url("https://x.org/a?id=7&utm_medium=email")
 
 
+def test_google_analytics_linker_params_dropped():
+    # The _gl / _gac / _gcl_* linker family decorates click-throughs (seen on Ceres PDFs).
+    base = canonical_url("https://x.org/doc.pdf")
+    assert canonical_url("https://x.org/doc.pdf?_gl=1*1k2ppth*_gcl_aw*ABC") == base
+    assert canonical_url("https://x.org/doc.pdf?_gac=1.156.167&_gl=1*x") == base
+    assert canonical_url("https://x.org/doc.pdf?_gcl_au=1.2.3") == base
+    # a real param still survives alongside the tracking junk
+    assert canonical_url("https://x.org/doc.pdf?id=7&_gl=1*x") == "https://x.org/doc.pdf?id=7"
+
+
 def test_root_slash_and_non_http_preserved():
     assert canonical_url("https://x.org/") == "https://x.org/"  # root slash kept
     assert canonical_url("mailto:z@x.org") == "mailto:z@x.org"  # non-http untouched
