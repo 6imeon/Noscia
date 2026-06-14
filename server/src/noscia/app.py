@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import os
 import threading
+from collections import OrderedDict
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 from importlib.metadata import version as pkg_version
@@ -30,6 +31,9 @@ from .contract import (
     ProvidersResponse,
     SearchRequest,
     SearchResponse,
+    StructuredRequest,
+    StructuredResponse,
+    Tier,
 )
 from .ingest import run as ingest
 from .search.pipeline import run_search
@@ -95,10 +99,35 @@ def health() -> HealthResponse:
     return HealthResponse(status="ok" if db_ok else "degraded", db=db_ok, version=VERSION)
 
 
+# A tiny in-process cache of the last few retrievals, keyed by (query, tier). The
+# Structured tab fires right after a search with the same query, so this lets it reuse
+# the retrieval instead of re-running the whole embed+rerank pipeline (the ~1 min the
+# user saw). Snapshots are answer-free deep copies, so a cached entry never leaks a stale
+# synthesized answer. dev == prod single process, so a module-level cache is enough.
+_SEARCH_CACHE: OrderedDict[tuple[str, str], SearchResponse] = OrderedDict()
+_SEARCH_CACHE_MAX = 32
+
+
+def _remember(resp: SearchResponse) -> None:
+    key = (resp.query, resp.tier)
+    _SEARCH_CACHE[key] = resp.model_copy(deep=True)
+    _SEARCH_CACHE.move_to_end(key)
+    while len(_SEARCH_CACHE) > _SEARCH_CACHE_MAX:
+        _SEARCH_CACHE.popitem(last=False)
+
+
+def _recall(query: str, tier: Tier) -> SearchResponse | None:
+    hit = _SEARCH_CACHE.get((query, tier))
+    if hit is not None:
+        _SEARCH_CACHE.move_to_end((query, tier))
+    return hit
+
+
 @app.post("/search", response_model=SearchResponse)
 async def search(req: SearchRequest) -> SearchResponse:
     # embed → (hybrid+rerank | dense) → highlight. See search/pipeline.py.
     resp = run_search(req)
+    _remember(resp)  # answer-free snapshot for a follow-up /structured on the same query
     if req.summarize:
         resp = await _attach_answer(req.query, resp)
     return resp
@@ -128,6 +157,36 @@ def _passage_text(highlight: str) -> str:
     import re
 
     return html.unescape(re.sub(r"</?mark>", "", highlight))
+
+
+@app.post("/structured", response_model=StructuredResponse)
+async def structured(req: StructuredRequest) -> StructuredResponse:
+    """BYOK structured extraction: run the same search, then return the answer as typed,
+    cited fields from the top passages — null when unsupported (rule 8). AUTO mode (no
+    fields requested) derives the salient fields from the query so Structured mirrors the
+    prose Answer; MANUAL mode fills exactly the pinned fields. See search/structured.py.
+    Stateless: re-runs the pipeline so [n] maps to the returned results regardless of what
+    the client last searched."""
+    from .search import structured as st
+
+    # Reuse the just-run retrieval when the query matches (the common case — Structured
+    # fires right after a search), else run it. Avoids paying for embed+rerank twice.
+    resp = _recall(req.query, req.tier) or run_search(SearchRequest(query=req.query, tier=req.tier))
+    passages = [_passage_text(r.highlight) for r in resp.results[: st.DEFAULT_TOP_N]]
+    auto = not req.fields
+    fields = (
+        await st.auto_extract(req.query, passages)
+        if auto
+        else await st.extract_structured(req.query, passages, req.fields)
+    )
+    return StructuredResponse(
+        query=req.query,
+        tier=req.tier,
+        results=resp.results,
+        fields=fields,
+        extracted=bool(get_secret("openrouter")),
+        auto=auto,
+    )
 
 
 @app.get("/corpus", response_model=CorpusResponse)

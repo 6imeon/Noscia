@@ -22,6 +22,7 @@ from ..contract import (
 from . import rerank as rerank_mod
 from .embed import embed_query
 from .highlight import highlight
+from .recency import apply_recency_prior
 from .store import Fused, Hit, get_store
 
 # Quality tier reranks this many fused candidates down to req.top_k.
@@ -42,6 +43,7 @@ def _to_results(query: str, hits: list[Hit]) -> list[SearchResult]:
                 score=round(h.score, 4),
                 highlight=highlight(query, c.text),
                 fresh=c.fresh,
+                published_at=c.published_at.date().isoformat() if c.published_at else None,
             )
         )
     return results
@@ -52,18 +54,21 @@ def run_search(req: SearchRequest) -> SearchResponse:
 
     if req.tier == "fast":
         fused: Fused = get_store().dense_search(qvec, req.top_k)
-        hits = fused.hits
+        # News-weighted recency prior, applied last so it nudges the final order (a no-op
+        # for every non-news / un-dated hit). Mirrored in the eval retrievers (rule 9).
+        hits = apply_recency_prior(fused.hits)
         trace = PipelineTrace(
             dense=fused.dense_n, bm25=0, fused=len(hits), reranked=0
         )
     else:  # quality
         fused = get_store().hybrid_search(req.query, qvec, RERANK_CANDIDATES)
-        hits = rerank_mod.rerank(req.query, fused.hits, req.top_k)
+        reranked = rerank_mod.rerank(req.query, fused.hits, req.top_k)
+        hits = apply_recency_prior(reranked)  # recency nudges the reranked order
         trace = PipelineTrace(
             dense=fused.dense_n,
             bm25=fused.bm25_n,
             fused=len(fused.hits),
-            reranked=len(hits),
+            reranked=len(reranked),
         )
 
     return SearchResponse(

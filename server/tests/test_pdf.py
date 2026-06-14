@@ -1,9 +1,10 @@
 """PDF discovery + title heuristics (no network — extraction is exercised live)."""
 
+from datetime import UTC, datetime
 from types import SimpleNamespace
 
 from noscia.ingest.crawl import _collect_pdf_urls
-from noscia.ingest.pdf import _clean_pdf_text, _filename_title
+from noscia.ingest.pdf import _clean_pdf_text, _filename_title, _pdf_published_at
 
 
 def _result(*hrefs, kind="internal"):
@@ -30,6 +31,36 @@ def test_clean_pdf_text_reflows_wraps_keeps_paragraphs():
 
 def test_clean_pdf_text_empty_is_empty():
     assert _clean_pdf_text("   \n  \n ") == ""
+
+
+def test_pdf_published_at_prefers_creation_date():
+    meta = SimpleNamespace(
+        creation_date=datetime(2017, 6, 29, tzinfo=UTC),
+        modification_date=datetime(2021, 10, 1, tzinfo=UTC),
+    )
+    assert _pdf_published_at(meta) == datetime(2017, 6, 29, tzinfo=UTC)
+
+
+def test_pdf_published_at_falls_back_to_modification_date():
+    meta = SimpleNamespace(creation_date=None, modification_date=datetime(2020, 3, 1))
+    out = _pdf_published_at(meta)
+    assert out == datetime(2020, 3, 1, tzinfo=UTC)  # naive normalized to UTC
+
+
+def test_pdf_published_at_rejects_garbage_and_missing():
+    assert _pdf_published_at(SimpleNamespace()) is None  # no date attrs at all
+    assert _pdf_published_at(SimpleNamespace(creation_date=datetime(1, 1, 1))) is None  # pre-1990
+
+
+def test_pdf_published_at_survives_malformed_metadata():
+    class Bad:
+        @property
+        def creation_date(self):
+            raise ValueError("malformed /CreationDate")
+
+        modification_date = None
+
+    assert _pdf_published_at(Bad()) is None
 
 
 def test_collect_same_site_pdfs_only_by_default():

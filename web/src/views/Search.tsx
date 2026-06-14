@@ -3,7 +3,7 @@
 // opens its cited passage in the reader. Empty/loading/error/done states.
 import { useEffect, useState } from 'react'
 import { api, type SearchResponse, type SearchResult, type Tier } from '../lib/api'
-import { AnswerBanner } from '../components/AnswerBanner'
+import { OutputPane } from '../components/OutputPane'
 import { PassageReader } from '../components/PassageReader'
 import { ResultRow } from '../components/ResultRow'
 import { SearchBar } from '../components/SearchBar'
@@ -67,7 +67,7 @@ export function Search() {
         <section className="flex min-h-0 flex-col">
           <div className="min-h-0 basis-1/2 overflow-hidden border-b border-line">
             {status.kind === 'done' ? (
-              <AnswerBanner
+              <OutputPane
                 data={status.data}
                 onSelect={setSelected}
                 keyConfigured={keyConfigured}

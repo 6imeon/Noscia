@@ -17,6 +17,7 @@ from __future__ import annotations
 
 import io
 import re
+from datetime import UTC, datetime
 
 from .crawl import _UA, CrawledPage
 
@@ -60,8 +61,29 @@ def _clean_pdf_text(text: str) -> str:
     return text.strip()
 
 
-def _extract_text(data: bytes) -> tuple[str, str | None]:
-    """``(text, pdf_title)`` from PDF bytes via pypdf. Page text reflowed to prose."""
+def _pdf_published_at(meta) -> datetime | None:
+    """Document date from PDF info: ``/CreationDate`` (publication proxy), else ``/ModDate``.
+
+    pypdf parses ``D:YYYYMMDD…`` into a ``datetime`` via ``.creation_date`` /
+    ``.modification_date`` and raises on malformed values — fail soft to None (rule 8).
+    A sanity window rejects placeholder/garbage dates.
+    """
+    for attr in ("creation_date", "modification_date"):
+        try:
+            dt = getattr(meta, attr, None)
+        except Exception:  # noqa: BLE001 — pypdf raises on malformed /CreationDate
+            continue
+        if not isinstance(dt, datetime):
+            continue
+        if dt.tzinfo is None:
+            dt = dt.replace(tzinfo=UTC)
+        if 1990 <= dt.year <= datetime.now(UTC).year + 1:
+            return dt.astimezone(UTC)
+    return None
+
+
+def _extract_text(data: bytes) -> tuple[str, str | None, datetime | None]:
+    """``(text, pdf_title, published_at)`` from PDF bytes. Page text reflowed to prose."""
     from pypdf import PdfReader
     from pypdf.errors import PdfReadError
 
@@ -87,7 +109,7 @@ def _extract_text(data: bytes) -> tuple[str, str | None]:
             pages.append(cleaned)
     meta = reader.metadata or {}
     pdf_title = (getattr(meta, "title", None) or "").strip() or None
-    return "\n\n".join(pages), pdf_title
+    return "\n\n".join(pages), pdf_title, _pdf_published_at(meta)
 
 
 async def extract_pdf(url: str, *, max_bytes: int = _MAX_PDF_BYTES) -> CrawledPage:
@@ -120,7 +142,7 @@ async def extract_pdf(url: str, *, max_bytes: int = _MAX_PDF_BYTES) -> CrawledPa
         return CrawledPage(url, url, "", ok=False, error=f"{type(exc).__name__}: {exc}")
 
     try:
-        text, pdf_title = _extract_text(bytes(buf))
+        text, pdf_title, published_at = _extract_text(bytes(buf))
     except ValueError as exc:
         return CrawledPage(url, url, "", ok=False, error=str(exc))
 
@@ -128,4 +150,4 @@ async def extract_pdf(url: str, *, max_bytes: int = _MAX_PDF_BYTES) -> CrawledPa
         # Likely a scanned/image-only PDF — no text layer to embed (we don't OCR).
         return CrawledPage(url, url, "", ok=False, error="empty pdf text (scanned?)")
 
-    return CrawledPage(url, pdf_title or _filename_title(url), text)
+    return CrawledPage(url, pdf_title or _filename_title(url), text, published_at=published_at)

@@ -1,5 +1,6 @@
 // Left icon rail (62px) — logo, view switcher, Settings pinned bottom,
 // vertical chunk count at the very bottom (SPEC §8.3).
+import { Logo } from './Logo'
 
 export type ViewId = 'search' | 'entity' | 'corpus' | 'settings'
 
@@ -48,8 +49,11 @@ export function Rail({
 }) {
   return (
     <nav className="flex w-[62px] shrink-0 flex-col items-center gap-1 border-r border-line bg-rail py-3">
-      <div className="mb-3 flex h-8 w-8 items-center justify-center rounded-md bg-accent/15 font-mono text-base font-semibold text-accent">
-        N
+      <div
+        className="mb-3 flex h-8 w-8 items-center justify-center rounded-md bg-accent/15"
+        title="Noscia"
+      >
+        <Logo size={22} />
       </div>
       {NAV.map((n) => (
         <RailButton

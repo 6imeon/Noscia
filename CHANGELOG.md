@@ -104,6 +104,81 @@ now a **site section**, not one page.
   CPU-only Docker container (Docker on macOS can't reach Metal) — for a snappy dev loop run
   the API natively on the host (`docker compose up postgres` + host `uvicorn`).
 
+### Recency — publication dates + a news-weighted ranking prior (`search/recency.py`)
+- The index recorded only `crawled_at` (when *we* fetched a page), never when the document
+  was *published* — so ranking couldn't tell a 2024 piece from a 2017 one, and the UI
+  surfaced near-decade-old sources with no date shown. Two parts fix that:
+- **Publication-date extraction at ingest.** `crawl.py` reads the `<head>` meta
+  (`article:published_time` / `og:published_time` / Dublin Core / `citation_*` / JSON-LD
+  `datePublished`, priority-ordered) and `pdf.py` reads the PDF `/CreationDate` (the
+  document date HTML crawling can't see — e.g. the TCFD reports). Both parse to a tz-aware
+  UTC date through a sanity window (1990…now+1y), and are strictly **evidence-or-null**
+  (rule 8): an unparseable or absent date stays `NULL`, never guessed. Stored in a new
+  nullable `chunks.published_at` (idempotent `ALTER`); because publication date is
+  *page-level*, `store.stamp_published_at` backfills every chunk of a page so an
+  *incremental* recrawl dates even content the hash-diff left untouched.
+- **News-weighted recency prior.** `apply_recency_prior` (post-rerank, mirrored in the eval
+  retrievers) nudges results by a bounded, **boost-only** multiplier — applied **only** to
+  the `news` source_type, decaying with a 180-day half-life. Evergreen standards are never
+  touched (TCFD 2017 is still canonical; age ≠ staleness), un-dated chunks are a no-op, and
+  nothing is ever demoted below its relevance baseline.
+- **Eval-gated to 0.05 (rule 9).** A first pass at `MAX_BOOST=0.15` *regressed* the gate
+  (Quality nDCG@10 0.918→0.893): a same-day esgtoday article on the new SBTi net-zero
+  standard leapfrogged SBTi's own authoritative page (q10). A sweep showed parity holds
+  through 0.08 and breaks at 0.10, so the prior ships at **0.05** — a true tie-break (can
+  only reorder items already within 5% relevance, never override a clear winner). Eval at
+  0.05 is byte-identical to baseline: Quality **nDCG@10 0.918 / MRR 0.933 / Recall@10
+  0.911**, Fast **0.884 / 0.900 / 0.911**. Note: the eval set is framework-centric, so the
+  gate proves *no regression* but cannot yet measure the prior's *benefit* on time-sensitive
+  news queries — adding news-relevance eval queries is the honest next gate.
+- **UI** surfaces the date: a compact year on each result row (full date on hover) and a
+  `published · YYYY-MM-DD` field in the passage reader. `SearchResult.published_at` added to
+  the contract + TS mirror.
+
+### Structured extraction — the answer as cited JSON (`search/structured.py`, `/structured`)
+- A second output tab beside the prose answer (cf. Exa's Answer / Structured): same grounded
+  retrieval, but the model returns the answer as a **flat JSON object** — snake_case keys
+  naming the salient aspects of the query, each `value` one self-contained synthesized
+  sentence, each carrying the source rows it drew on. One BYOK call constrained by an
+  OpenAI/OpenRouter **Structured-Outputs** JSON schema over the same top passages the answer
+  uses, so a structured pull costs no extra retrieval — just one synthesis.
+- **Two modes, one contract.** AUTO (default, empty `fields`): the model derives the fields
+  from the query so the tab mirrors the answer instead of forcing a fixed schema that comes
+  back all-blank when it doesn't fit the question. MANUAL (pinned `fields`): the caller fixes
+  a schema (build-a-table use case), slugged into a strict per-field object. Both are
+  **evidence-or-null** (rule 8): an unsupported field/value is `null`, uncited — never guessed.
+  No key ⇒ all-null, no error.
+- **Auto-runs once per query** when the tab is first opened (no click), and the result is
+  cached across tab switches so a paid call never re-fires on a flip; MANUAL waits for an
+  explicit Extract so field edits don't fire a call per keystroke.
+- **No re-running the pipeline.** `/structured` reuses the just-run retrieval via a small
+  in-process last-search cache keyed by (query, tier) — answer-free deep-copy snapshots, so a
+  cached entry can't leak a stale synthesized answer. Cut the Structured latency from re-doing
+  embed+rerank (≈1 min in the CPU-only container) to the single LLM call (~4–5 s).
+- Contract grew `StructuredField` / `StructuredRequest` / `ExtractedField` / `StructuredResponse`
+  (`contract.py` ⇄ `web/src/lib/api.ts`, matched). Frontend: `OutputPane` tabs (✦ Answer /
+  ⊞ Structured), `StructuredPanel` (JSON-object render, `null` for blanks, collapsible field
+  editor + ESG preset), and shared citation primitives extracted to `Citations.tsx`
+  (`CitedText` for the answer's inline `[n]`, `CiteHosts` for the structured values' Exa-style
+  `host +N` chips, `Sources` list) so both tabs render provenance identically.
+
+### Visual identity — light "Oat" theme + the Neural-N mark
+- **Theme flipped dark → light.** The `@theme` tokens in `index.css` moved from the espresso
+  shell to a warm off-white **"Oat"** nude palette (dark ink on warm paper). Components still
+  read only tokens — no hard-coded hex (the day-one rule) — so the flip was a token swap plus
+  one new `--color-on-accent` for text on filled accent buttons (the three active toggles that
+  had assumed a dark page background are now legible on the light surface).
+- **Neural-N logo + favicon.** A node-edge "N" graph (four corner nodes + a center hub):
+  `app/Logo.tsx` is the themed in-app mark (reads `--color-accent` / `--color-ink`), and
+  `public/favicon.svg` is the dark app-icon tile (replacing the stock Vite mark). Explorations
+  kept under `design/mockups/` (5 light palettes, 10 logo concepts).
+
+### Cite action — real copy, honest label (`PassageReader.tsx`)
+- The reader's Cite button copied `"{title} — {url}"` to the clipboard but gave **no
+  feedback** and was labelled `⌘C` for a shortcut that was never wired. Now it confirms
+  (**✓ Copied**, reverts after 1.5 s), fails soft when the clipboard is blocked, and drops the
+  misleading `⌘C` prefix (→ **❝ Cite**, with its own glyph so it's not a twin of ⧉ Open source).
+
 ## Phase 2 — Quality + freshness — 2026-06-14
 
 Two halves landed: an **eval gate** for every model change, and **incremental

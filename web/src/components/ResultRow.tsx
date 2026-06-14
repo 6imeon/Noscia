@@ -34,7 +34,14 @@ export function ResultRow({
         <span className="font-mono text-[10px] text-dim">#{result.rank}</span>
         <SourceBadge type={result.source_type} />
         <ScoreBar score={result.score} />
-        {result.fresh && <span className="ml-auto font-mono text-[10px] text-ok">● fresh</span>}
+        <div className="ml-auto flex items-center gap-2 font-mono text-[10px]">
+          {result.published_at && (
+            <span className="text-dim" title={`published ${result.published_at}`}>
+              {result.published_at.slice(0, 4)}
+            </span>
+          )}
+          {result.fresh && <span className="text-ok">● fresh</span>}
+        </div>
       </div>
       <div className="mt-1.5 truncate text-sm text-ink">{result.title}</div>
       <div className="truncate font-mono text-[10px] text-dim">

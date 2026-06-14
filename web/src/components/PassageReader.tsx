@@ -14,15 +14,21 @@ function stripMarks(html: string): string {
 
 export function PassageReader({ result }: { result: SearchResult | null }) {
   const [scope, setScope] = useState<Scope>('highlighted')
+  const [copied, setCopied] = useState(false)
 
   if (!result)
     return <div className="p-6 text-sm text-dim">select a result →</div>
 
   const body = scope === 'highlighted' ? result.highlight : stripMarks(result.highlight)
 
-  const cite = () => {
-    const text = `${result.title} — ${result.url}`
-    void navigator.clipboard?.writeText(text)
+  const cite = async () => {
+    try {
+      await navigator.clipboard?.writeText(`${result.title} — ${result.url}`)
+      setCopied(true)
+      window.setTimeout(() => setCopied(false), 1500)
+    } catch {
+      /* clipboard blocked (no permission / insecure context) — leave the label as-is */
+    }
   }
 
   return (
@@ -45,6 +51,7 @@ export function PassageReader({ result }: { result: SearchResult | null }) {
         <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-1 font-mono text-[10px] text-muted">
           {result.org && <span>org · {result.org}</span>}
           <span>type · {result.source_type}</span>
+          {result.published_at && <span>published · {result.published_at}</span>}
           <span>score · {result.score.toFixed(3)}</span>
           <span>rank · #{result.rank}</span>
         </div>
@@ -58,7 +65,7 @@ export function PassageReader({ result }: { result: SearchResult | null }) {
               type="button"
               onClick={() => setScope(s)}
               className={`px-2.5 py-1 capitalize transition-colors ${
-                scope === s ? 'text-bg' : 'text-muted hover:bg-hover'
+                scope === s ? 'text-on-accent' : 'text-muted hover:bg-hover'
               }`}
               style={scope === s ? { background: 'var(--color-accent)' } : undefined}
             >
@@ -95,9 +102,12 @@ export function PassageReader({ result }: { result: SearchResult | null }) {
         <button
           type="button"
           onClick={cite}
-          className="rounded border border-line px-2 py-1 text-muted hover:bg-hover"
+          title="Copy citation (title — URL) to clipboard"
+          className={`rounded border px-2 py-1 transition-colors ${
+            copied ? 'border-ok text-ok' : 'border-line text-muted hover:bg-hover'
+          }`}
         >
-          ⌘C Cite
+          {copied ? '✓ Copied' : '❝ Cite'}
         </button>
       </footer>
     </div>

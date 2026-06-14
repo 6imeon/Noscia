@@ -127,12 +127,17 @@ def _index_page(page: CrawledPage, spec: dict, source_url: str) -> PageResult:
             content_hash=tc.content_hash,
             token_count=tc.token_count,
             dense=vec,
+            published_at=page.published_at,
         )
         for (cid, tc), vec in zip(changed, vectors, strict=True)
     ]
     store.upsert(records)
     vanished = [cid for cid in existing if cid not in new_ids]
     store.delete_ids(vanished)
+    # Publication date is page-level: stamp every chunk of the page (including those the
+    # content-hash diff left untouched) so an incremental recrawl backfills the date too.
+    if page.published_at is not None:
+        store.stamp_published_at(page.url, page.published_at)
 
     total = len(text_chunks)
     return PageResult(

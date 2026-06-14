@@ -54,6 +54,7 @@ class SearchResult(BaseModel):
     score: float
     highlight: str  # best-matching passage; may contain <mark>…</mark> spans
     fresh: bool = False
+    published_at: str | None = None  # document publish date (ISO YYYY-MM-DD), null if unknown
 
 
 class SearchResponse(BaseModel):
@@ -68,6 +69,47 @@ class SearchResponse(BaseModel):
     summarized: bool = False
     answer: str | None = None
     answer_citations: list[int] = Field(default_factory=list)
+
+
+# --- /structured (BYOK schema extraction over the top passages) ----------
+# Exa-style "Structured" tab: the same grounded retrieval, but instead of prose the
+# model returns the answer as typed fields — one value per field, each cited, blank
+# (null) when the passages don't support it (evidence-or-null, rule 8).
+#
+# Two modes share this contract. AUTO (default): `fields` is empty, and the model
+# derives the salient fields from the query+passages — so Structured mirrors the prose
+# Answer instead of forcing a fixed schema that may not fit the question. MANUAL: the
+# caller pins specific fields (build-a-table use case) and we fill exactly those.
+class StructuredField(BaseModel):
+    name: str = Field(min_length=1, max_length=60)  # display name (becomes the JSON key)
+    description: str = Field(default="", max_length=200)  # what to extract; guides the model
+
+
+class StructuredRequest(BaseModel):
+    query: str = Field(min_length=1)
+    tier: Tier = "quality"
+    # Empty ⇒ AUTO mode (fields inferred from the query). Non-empty ⇒ MANUAL fixed schema.
+    fields: list[StructuredField] = Field(default_factory=list, max_length=8)
+
+
+class ExtractedField(BaseModel):
+    name: str  # echoes the requested field's display name
+    value: str | None = None  # may contain inline [n] citations; null when unsupported
+    citations: list[int] = Field(default_factory=list)  # 1-based result ranks cited
+
+
+class StructuredResponse(BaseModel):
+    query: str
+    tier: Tier
+    results: list[SearchResult]  # the passages extracted over (so [n] maps to a source)
+    # The answer as a flat object — snake_case fields (AUTO) or the pinned fields (MANUAL),
+    # each a cited value, null when the passages don't support it.
+    fields: list[ExtractedField]
+    # True when a reasoning key was configured and extraction ran — distinguishes
+    # "no key" from "key, nothing in the corpus" (all-null fields).
+    extracted: bool = False
+    # True when the fields were inferred from the query (AUTO), False for a pinned schema.
+    auto: bool = False
 
 
 # --- /corpus (index stats + sources; Corpus view §8.4) -------------------

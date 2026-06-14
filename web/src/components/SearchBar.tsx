@@ -52,7 +52,7 @@ export function SearchBar({
           }
           className={`rounded-md border px-3 py-2 font-mono text-xs transition-colors disabled:opacity-40 ${
             summarize && summarizeAvailable
-              ? 'border-accent text-bg'
+              ? 'border-accent text-on-accent'
               : 'border-line text-muted hover:bg-hover'
           }`}
           style={summarize && summarizeAvailable ? { background: 'var(--color-accent)' } : undefined}
@@ -83,7 +83,7 @@ export function TierToggle({
           disabled={disabled}
           onClick={() => onTier(t)}
           className={`px-3 py-2 capitalize transition-colors disabled:opacity-50 ${
-            tier === t ? 'text-bg' : 'text-muted hover:bg-hover'
+            tier === t ? 'text-on-accent' : 'text-muted hover:bg-hover'
           }`}
           style={tier === t ? { background: 'var(--color-accent)' } : undefined}
         >

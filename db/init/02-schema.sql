@@ -15,12 +15,18 @@ CREATE TABLE IF NOT EXISTS chunks (
     content_hash  TEXT        NOT NULL,             -- sha256 of normalized text (Phase 2 incremental crawl)
     token_count   INTEGER,
     dense         vector(256) NOT NULL,             -- Qwen3 → Matryoshka 256, L2-normalized
-    crawled_at    TIMESTAMPTZ NOT NULL DEFAULT now()
+    crawled_at    TIMESTAMPTZ NOT NULL DEFAULT now(),
+    published_at  TIMESTAMPTZ                        -- when the *document* was published (NULL = unknown); ≠ crawled_at. Evidence-or-null: only set when a date is found in page/PDF metadata
 );
 
 -- Deep crawl (Phase 2.5): a seed expands to many same-domain pages; source_url ties
 -- each chunk back to its seed so a vanished page's chunks can be pruned source-wide.
 ALTER TABLE chunks ADD COLUMN IF NOT EXISTS source_url TEXT;
+
+-- Phase 2 recency: document publication date, extracted from HTML head meta / PDF
+-- metadata at ingest. Nullable — a missing date never penalizes (the news-weighted
+-- recency prior treats un-dated chunks as a no-op). Added to pre-existing tables too.
+ALTER TABLE chunks ADD COLUMN IF NOT EXISTS published_at TIMESTAMPTZ;
 
 -- Dense ANN: HNSW over cosine distance (pgvector). `<=>` is cosine distance.
 CREATE INDEX IF NOT EXISTS chunks_dense_hnsw

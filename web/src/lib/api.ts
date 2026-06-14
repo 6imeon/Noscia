@@ -40,6 +40,7 @@ export interface SearchResult {
   score: number
   highlight: string
   fresh: boolean
+  published_at?: string | null // document publish date (ISO YYYY-MM-DD), null if unknown
 }
 
 export interface SearchResponse {
@@ -50,6 +51,33 @@ export interface SearchResponse {
   summarized?: boolean
   answer?: string | null
   answer_citations?: number[]
+}
+
+// --- /structured (BYOK schema extraction over the top passages) ---
+export interface StructuredField {
+  name: string
+  description?: string
+}
+
+export interface StructuredRequest {
+  query: string
+  tier: Tier
+  fields: StructuredField[] // empty ⇒ AUTO mode (fields inferred from the query)
+}
+
+export interface ExtractedField {
+  name: string
+  value: string | null // may contain inline [n] citations; null when unsupported
+  citations: number[]
+}
+
+export interface StructuredResponse {
+  query: string
+  tier: Tier
+  results: SearchResult[]
+  fields: ExtractedField[] // the answer as a flat object — snake_case keys (AUTO) or pinned (MANUAL)
+  extracted: boolean
+  auto: boolean // fields were inferred from the query (AUTO) vs a pinned schema (MANUAL)
 }
 
 export interface ProviderKeyStatus {
@@ -125,6 +153,8 @@ export const api = {
   providers: () => request<ProvidersResponse>('/providers'),
   search: (body: SearchRequest) =>
     request<SearchResponse>('/search', { method: 'POST', body: JSON.stringify(body) }),
+  structured: (body: StructuredRequest) =>
+    request<StructuredResponse>('/structured', { method: 'POST', body: JSON.stringify(body) }),
   corpus: () => request<CorpusResponse>('/corpus'),
   ingest: (body: IngestRequest = {}) =>
     request<IngestResponse>('/corpus/ingest', { method: 'POST', body: JSON.stringify(body) }),

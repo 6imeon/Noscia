@@ -1,0 +1,211 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Noscia — light palette exploration (muted nude, brighter)</title>
+<style>
+  /* Five LIGHT, muted-nude palettes — warm off-white surfaces, dark ink.
+     Same "research console" warmth, but airy instead of a dark shell. Each card
+     renders the real answer-panel + sources + search bar so the colour reads in
+     context. Badge dots neutralised per-palette here (live app keeps category colours). */
+
+  /* 1 — Linen: warm off-white, the classic bright nude */
+  .p-linen {
+    --bg:#f4efe7; --panel:#fbf7f0; --panel2:#f7f2ea; --field:#fffdf9;
+    --line:#e3dacd; --line2:#ece4d8; --hover:#f0e9dd; --sel:#f1e7d6;
+    --ink:#34302a; --muted:#6f6657; --dim:#9a9080;
+    --accent:#c08552; --accent2:#b27843; --soft:rgba(192,133,82,.12);
+    --badge:#8f8675; --btnink:#fff;
+  }
+  /* 2 — Oat: slightly deeper cream, a touch more body than Linen */
+  .p-oat {
+    --bg:#efe8dc; --panel:#f8f2e7; --panel2:#f3ece0; --field:#fdfaf3;
+    --line:#ddd3c2; --line2:#e7ddcd; --hover:#ebe2d2; --sel:#ede0ca;
+    --ink:#332f28; --muted:#6c6354; --dim:#968b79;
+    --accent:#bf8a55; --accent2:#b07c45; --soft:rgba(191,138,85,.12);
+    --badge:#8c8270; --btnink:#fff;
+  }
+  /* 3 — Porcelain: cool near-white greige, the cleanest / least warm */
+  .p-porc {
+    --bg:#f1f0ec; --panel:#fafaf7; --panel2:#f5f4f0; --field:#ffffff;
+    --line:#e0ddd4; --line2:#eae7df; --hover:#eeece5; --sel:#ece8dc;
+    --ink:#30302d; --muted:#67655d; --dim:#94918a;
+    --accent:#b78a64; --accent2:#a87c54; --soft:rgba(183,138,100,.11);
+    --badge:#8a877f; --btnink:#fff;
+  }
+  /* 4 — Sand: light tan, warmest surfaces of the light set */
+  .p-sand {
+    --bg:#ece2d1; --panel:#f6eedf; --panel2:#f0e7d6; --field:#fbf6ec;
+    --line:#d8ccb6; --line2:#e4d8c4; --hover:#e8ddc8; --sel:#ecddc0;
+    --ink:#352f25; --muted:#6f6450; --dim:#9a8d75;
+    --accent:#c08a4d; --accent2:#b27c3d; --soft:rgba(192,138,77,.13);
+    --badge:#8e836c; --btnink:#fff;
+  }
+  /* 5 — Blush: light warm pinkish nude, soft rose accent */
+  .p-blush {
+    --bg:#f3eae4; --panel:#fbf4ef; --panel2:#f6ede7; --field:#fffbf8;
+    --line:#e6d8cf; --line2:#efe2da; --hover:#f1e6df; --sel:#f0e2d8;
+    --ink:#352e2a; --muted:#71655d; --dim:#9d8f86;
+    --accent:#c1816c; --accent2:#b3735e; --soft:rgba(193,129,108,.12);
+    --badge:#988a82; --btnink:#fff;
+  }
+
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: #e8e2d8;
+    color: #3a352e;
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Inter, Roboto, sans-serif;
+    -webkit-font-smoothing: antialiased;
+    padding: 28px 24px 60px;
+  }
+  h1 { font-size: 18px; font-weight: 600; margin: 0 0 4px; }
+  .lede { color: #756c5e; font-size: 13px; margin: 0 0 24px; max-width: 780px; line-height: 1.5; }
+  .mono { font-family: 'SF Mono', ui-monospace, 'JetBrains Mono', Menlo, Consolas, monospace; }
+
+  .grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(420px, 1fr));
+    gap: 22px;
+  }
+
+  .card {
+    background: var(--bg);
+    border: 1px solid var(--line);
+    border-radius: 12px;
+    overflow: hidden;
+    box-shadow: 0 6px 22px rgba(80,66,48,.16);
+  }
+  .card-head {
+    display: flex; align-items: center; gap: 10px;
+    padding: 12px 16px;
+    border-bottom: 1px solid var(--line);
+    background: var(--panel2);
+  }
+  .name { font-size: 13px; font-weight: 600; color: var(--ink); }
+  .num { font-size: 11px; color: var(--accent2); }
+  .swatches { margin-left: auto; display: flex; gap: 6px; }
+  .sw { width: 16px; height: 16px; border-radius: 4px; border: 1px solid rgba(0,0,0,.08); }
+
+  .body { padding: 14px 16px 16px; }
+
+  .answer-head {
+    font-size: 10px; text-transform: uppercase; letter-spacing: .06em;
+    color: var(--accent2); padding-bottom: 8px;
+    border-bottom: 1px solid var(--line);
+  }
+  .answer-head .sub { color: var(--dim); text-transform: none; letter-spacing: normal; margin-left: 6px; }
+  .answer {
+    background: var(--soft);
+    border-radius: 8px;
+    padding: 12px 14px;
+    margin-top: 12px;
+  }
+  .answer p { margin: 0; font-size: 14px; line-height: 1.65; color: var(--ink); }
+  .chip {
+    display: inline-flex; align-items: center; justify-content: center;
+    height: 15px; min-width: 15px; padding: 0 4px; margin: 0 1px;
+    border-radius: 4px; background: color-mix(in srgb, var(--accent) 18%, transparent);
+    color: var(--accent2); font-size: 9px; vertical-align: text-top;
+  }
+
+  .src-label {
+    margin-top: 16px; font-size: 10px; text-transform: uppercase; letter-spacing: .06em;
+    color: var(--dim); margin-bottom: 8px;
+  }
+  .src {
+    display: flex; gap: 10px; align-items: flex-start;
+    border: 1px solid var(--line2); background: var(--panel);
+    border-radius: 8px; padding: 9px 11px; margin-bottom: 7px;
+  }
+  .src .title { font-size: 12.5px; color: var(--ink); margin: 3px 0 2px; }
+  .src .meta { font-size: 10px; color: var(--dim); }
+  .badge {
+    display: inline-flex; align-items: center; gap: 4px;
+    font-size: 9px; text-transform: uppercase; letter-spacing: .04em;
+    color: var(--badge);
+  }
+  .badge::before { content:''; width: 6px; height: 6px; border-radius: 2px; background: var(--badge); }
+  .date { font-size: 10px; color: var(--dim); margin-left: 6px; }
+
+  .searchbar { display: flex; gap: 8px; margin-top: 16px; }
+  .input {
+    flex: 1; background: var(--field); border: 1px solid var(--line);
+    border-radius: 7px; padding: 8px 11px; color: var(--ink); font-size: 12.5px;
+  }
+  .btn {
+    background: var(--accent); color: var(--btnink); border: none;
+    border-radius: 7px; padding: 8px 14px; font-size: 12.5px; font-weight: 600; cursor: pointer;
+  }
+  .hovered { background: var(--hover); }
+  mark { background: color-mix(in srgb, var(--accent) 20%, transparent); color: var(--ink); border-radius: 2px; padding: 0 1px; }
+</style>
+</head>
+<body>
+  <h1>Noscia — light palette exploration</h1>
+  <p class="lede">
+    Brighter take — five <strong>light</strong> muted-nude directions (warm off-white surfaces,
+    dark ink) instead of a dark shell. Same research-console warmth, airier. Each card renders the
+    real answer-panel + sources + search bar so the colour reads in context. Tell me a number — or
+    mix-and-match (e.g. “Porcelain surfaces, Sand accent”).
+  </p>
+
+  <div class="grid" id="grid"></div>
+
+  <script>
+    // One template, five palettes — keeps the cards identical so only colour differs.
+    const palettes = [
+      ['p-linen', 'Linen',     '01 · warm off-white'],
+      ['p-oat',   'Oat',       '02 · deeper cream'],
+      ['p-porc',  'Porcelain', '03 · cool greige, cleanest'],
+      ['p-sand',  'Sand',      '04 · light tan, warmest'],
+      ['p-blush', 'Blush',     '05 · soft pinkish nude'],
+    ];
+    const card = (cls, name, num) => `
+      <div class="card ${cls}">
+        <div class="card-head">
+          <span class="name">${name}</span>
+          <span class="num mono">${num}</span>
+          <span class="swatches">
+            <span class="sw" style="background:var(--bg)"></span>
+            <span class="sw" style="background:var(--panel)"></span>
+            <span class="sw" style="background:var(--accent)"></span>
+            <span class="sw" style="background:var(--ink)"></span>
+          </span>
+        </div>
+        <div class="body">
+          <div class="answer-head">✦ Answer <span class="sub">· synthesized from the cited passages</span></div>
+          <div class="answer">
+            <p>The SBTi Corporate Net-Zero Standard requires near-term targets cutting emissions
+            ~50% by 2030 and ~90% by 2050<span class="chip">1</span>, with residual emissions
+            neutralised by permanent removals<span class="chip">2</span>. Version 2.0 adds
+            scope-3 thresholds for most sectors<span class="chip">3</span>.</p>
+          </div>
+          <div class="src-label mono">Sources · 3</div>
+          <div class="src">
+            <span class="chip">1</span>
+            <div>
+              <span class="badge">framework</span><span class="date mono">2025-06-11</span>
+              <div class="title">Corporate Net-Zero Standard v2.0</div>
+              <div class="meta mono">SBTi · sciencebasedtargets.org</div>
+            </div>
+          </div>
+          <div class="src hovered">
+            <span class="chip">2</span>
+            <div>
+              <span class="badge">ngo</span><span class="date mono">2024-11-02</span>
+              <div class="title">Beyond value chain mitigation guidance</div>
+              <div class="meta mono">WRI · wri.org</div>
+            </div>
+          </div>
+          <div class="searchbar">
+            <input class="input" value="carbon removal permanence standards" />
+            <button class="btn">Search</button>
+          </div>
+        </div>
+      </div>`;
+    document.getElementById('grid').innerHTML = palettes.map(p => card(...p)).join('');
+  </script>
+</body>
+</html>

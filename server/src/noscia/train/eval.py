@@ -142,18 +142,22 @@ def evaluate(name: str, retriever: Retriever, queries: list[EvalQuery], k: int) 
 
 def quality_retriever(query: str, k: int) -> list[str]:
     from ..search.embed import embed_query
+    from ..search.recency import apply_recency_prior
     from ..search.store import get_store
 
     fused = get_store().hybrid_search(query, embed_query(query), k)
-    return [h.chunk.url for h in fused.hits]
+    hits = apply_recency_prior(fused.hits)  # mirror the live pipeline's recency prior
+    return [h.chunk.url for h in hits]
 
 
 def fast_retriever(query: str, k: int) -> list[str]:
     from ..search.embed import embed_query
+    from ..search.recency import apply_recency_prior
     from ..search.store import get_store
 
     fused = get_store().dense_search(embed_query(query), k)
-    return [h.chunk.url for h in fused.hits]
+    hits = apply_recency_prior(fused.hits)
+    return [h.chunk.url for h in hits]
 
 
 RETRIEVERS: dict[str, Retriever] = {

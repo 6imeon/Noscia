@@ -1,38 +1,41 @@
 @import 'tailwindcss';
 
-/* Design tokens — "Research Console" espresso shell (SPEC §8.2).
-   Defined as Tailwind v4 @theme so utilities generate: bg-panel, text-ink,
-   border-line, text-accent, font-mono, etc. Single source of truth — components
-   never hard-code hex. */
+/* Design tokens — "Research Console", light "Oat" nude shell (SPEC §8.2).
+   Warm off-white surfaces, dark ink — airy, not a dark shell. Defined as
+   Tailwind v4 @theme so utilities generate: bg-panel, text-ink, border-line,
+   text-accent, font-mono, etc. Single source of truth — components never
+   hard-code hex. */
 @theme {
-  /* surfaces */
-  --color-bg: #201b16;
-  --color-panel: #29231c;
-  --color-panel-2: #241e18;
-  --color-rail: #1b1611;
-  --color-field: #181410;
+  /* surfaces — warm off-white, lifted (deeper cream "Oat") */
+  --color-bg: #efe8dc;
+  --color-panel: #f8f2e7;
+  --color-panel-2: #f3ece0;
+  --color-rail: #eae1d2;
+  --color-field: #fdfaf3;
   /* lines */
-  --color-line: #3a3127;
-  --color-line-2: #2a231c;
-  --color-hover: #2c2419;
-  --color-sel: #322617;
-  /* text */
-  --color-ink: #ece4d6;
-  --color-muted: #a89a86;
-  --color-dim: #776b5a;
-  /* accent */
-  --color-accent: #cc8a5c;
-  --color-accent-2: #b9764a;
-  /* status */
-  --color-ok: #92a07c;
-  --color-warn: #c2a368;
-  /* source-type system (SPEC §8.2) */
-  --color-framework: #8b97a3;
-  --color-regulator: #a08a9b;
-  --color-ratings: #c2a368;
-  --color-report: #92a07c;
-  --color-ngo: #7f9173;
-  --color-news: #bd8a76;
+  --color-line: #ddd3c2;
+  --color-line-2: #e7ddcd;
+  --color-hover: #ebe2d2;
+  --color-sel: #ede0ca;
+  /* text — dark ink on light */
+  --color-ink: #332f28;
+  --color-muted: #6c6354;
+  --color-dim: #968b79;
+  /* accent — warm caramel, readable on light */
+  --color-accent: #bf8a55;
+  --color-accent-2: #b07c45;
+  /* on-accent text (for filled accent buttons) */
+  --color-on-accent: #fffaf2;
+  /* status — darkened to read on light */
+  --color-ok: #6b7a52;
+  --color-warn: #9a7d3f;
+  /* source-type system (SPEC §8.2) — darkened for light surfaces */
+  --color-framework: #566875;
+  --color-regulator: #7c6377;
+  --color-ratings: #9a7d3f;
+  --color-report: #5f6e4d;
+  --color-ngo: #5a6e4f;
+  --color-news: #a06549;
   /* fonts */
   --font-sans: -apple-system, BlinkMacSystemFont, 'Segoe UI', Inter, Roboto, sans-serif;
   --font-mono: 'SF Mono', ui-monospace, 'JetBrains Mono', Menlo, Consolas, monospace;
@@ -40,10 +43,10 @@
 
 /* rgba tints that aren't plain colors (soft accent, highlight marks) */
 :root {
-  --accent-soft: rgba(204, 138, 92, 0.14);
-  --mark: rgba(204, 138, 92, 0.22);
-  --mark-line: rgba(204, 138, 92, 0.6);
-  --mark-ink: #f6ecdf;
+  --accent-soft: rgba(191, 138, 85, 0.12);
+  --mark: rgba(191, 138, 85, 0.24);
+  --mark-line: rgba(176, 124, 69, 0.55);
+  --mark-ink: #332f28;
 }
 
 html,

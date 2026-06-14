@@ -13,7 +13,9 @@ through to a full crawl and the content-hash diff catches the no-op anyway.
 
 from __future__ import annotations
 
+import re
 from dataclasses import dataclass
+from datetime import UTC, datetime
 from urllib.parse import urlsplit
 
 from .url import canonical_url
@@ -42,6 +44,7 @@ class CrawledPage:
     markdown: str
     ok: bool = True
     error: str | None = None
+    published_at: datetime | None = None  # document publish date when found (else None)
 
 
 @dataclass
@@ -146,6 +149,91 @@ def _extract_markdown(result) -> str:
 def _title_of(result, url: str) -> str:
     meta = getattr(result, "metadata", None) or {}
     return (meta.get("title") or "").strip() or url
+
+
+# Head-meta keys that carry a document's publish date, most-authoritative first. Lowercased
+# at lookup, so these match regardless of the tag's original case (DC.date.issued, etc.).
+_DATE_META_KEYS = (
+    "article:published_time",
+    "og:published_time",
+    "citation_publication_date",
+    "citation_date",
+    "dcterms.date",
+    "dcterms.created",
+    "dc.date.issued",
+    "dc.date",
+    "datepublished",
+    "publishdate",
+    "publish-date",
+    "pubdate",
+    "date",
+)
+_META_TAG_RE = re.compile(r"<meta\b[^>]*>", re.IGNORECASE)
+_JSONLD_DATE_RE = re.compile(r'"datePublished"\s*:\s*"([^"]+)"', re.IGNORECASE)
+
+
+def _parse_date(raw: str) -> datetime | None:
+    """Parse a common HTML/ISO date string to a tz-aware UTC ``datetime`` (None if not).
+
+    Handles ISO-8601 with ``Z``/offset and bare ``YYYY-MM-DD``; anything else (prose
+    dates, ``DD/MM/YYYY``) falls through to None — blank beats a guessed date (rule 8).
+    A sanity window rejects parser garbage (epoch 0, far-future placeholders).
+    """
+    s = (raw or "").strip()
+    if not s:
+        return None
+    iso = s.replace("Z", "+00:00")
+    for candidate in (iso, iso[:10]):  # full timestamp, then date-only prefix
+        try:
+            dt = datetime.fromisoformat(candidate)
+        except ValueError:
+            continue
+        if dt.tzinfo is None:
+            dt = dt.replace(tzinfo=UTC)
+        if 1990 <= dt.year <= datetime.now(UTC).year + 1:
+            return dt.astimezone(UTC)
+        return None
+    return None
+
+
+def _meta_attr(tag: str, name: str) -> str | None:
+    m = re.search(rf'{name}\s*=\s*"([^"]*)"', tag, re.IGNORECASE) or re.search(
+        rf"{name}\s*=\s*'([^']*)'", tag, re.IGNORECASE
+    )
+    return m.group(1) if m else None
+
+
+def _published_at_from_html(html: str) -> datetime | None:
+    """Scan a page's ``<head>`` meta tags (and JSON-LD) for a publish date."""
+    if not html:
+        return None
+    head = html[:200_000]  # dates live in <head>; cap the scan so a huge body is cheap
+    found: dict[str, str] = {}
+    for tag in _META_TAG_RE.findall(head):
+        key = _meta_attr(tag, "property") or _meta_attr(tag, "name") or _meta_attr(tag, "itemprop")
+        content = _meta_attr(tag, "content")
+        if key and content:
+            found.setdefault(key.lower().strip(), content)
+    for key in _DATE_META_KEYS:
+        if key in found:
+            dt = _parse_date(found[key])
+            if dt:
+                return dt
+    m = _JSONLD_DATE_RE.search(head)
+    return _parse_date(m.group(1)) if m else None
+
+
+def _published_at_of(result) -> datetime | None:
+    """Document publish date from crawl4ai metadata, else the raw HTML head (None if absent)."""
+    meta = getattr(result, "metadata", None) or {}
+    for k in ("article:published_time", "og:published_time", "published_time", "date"):
+        val = meta.get(k)
+        if val:
+            dt = _parse_date(str(val))
+            if dt:
+                return dt
+    html = getattr(result, "html", None) or getattr(result, "cleaned_html", None) or ""
+    return _published_at_from_html(html)
 
 
 def _registrable_domain(url: str) -> str:
@@ -262,7 +350,7 @@ async def crawl_site(
         if not markdown.strip():
             pages.append(CrawledPage(url, title, "", ok=False, error="empty markdown"))
             continue
-        pages.append(CrawledPage(url, title, markdown))
+        pages.append(CrawledPage(url, title, markdown, published_at=_published_at_of(result)))
 
     if max_pdfs > 0:
         pages += await _crawl_pdfs(
@@ -308,7 +396,9 @@ async def crawl_many(urls: list[str], page_timeout_ms: int = 45_000) -> list[Cra
                 if not markdown.strip():
                     pages.append(CrawledPage(url, title, "", ok=False, error="empty markdown"))
                     continue
-                pages.append(CrawledPage(url, title, markdown))
+                pages.append(
+                    CrawledPage(url, title, markdown, published_at=_published_at_of(result))
+                )
             except Exception as exc:  # one bad seed shouldn't sink the batch
                 err = f"{type(exc).__name__}: {exc}"
                 pages.append(CrawledPage(url, url, "", ok=False, error=err))

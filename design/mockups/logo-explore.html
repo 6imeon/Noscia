@@ -1,0 +1,335 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Noscia — logo exploration (10 directions)</title>
+<style>
+  /* Oat palette (matches the live app theme) */
+  :root {
+    --bg:#efe8dc; --panel:#f8f2e7; --panel2:#f3ece0; --field:#fdfaf3;
+    --line:#ddd3c2; --line2:#e7ddcd;
+    --ink:#332f28; --muted:#6c6354; --dim:#968b79;
+    --accent:#bf8a55; --accent2:#b07c45; --accent-soft:rgba(191,138,85,.12);
+    --leaf:#5f6e4d;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin:0; background:var(--bg); color:var(--ink);
+    font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Inter,Roboto,sans-serif;
+    -webkit-font-smoothing:antialiased; padding:30px 26px 64px;
+  }
+  h1 { font-size:18px; font-weight:600; margin:0 0 4px; }
+  .lede { color:var(--muted); font-size:13px; margin:0 0 26px; max-width:760px; line-height:1.55; }
+  .mono { font-family:'SF Mono',ui-monospace,'JetBrains Mono',Menlo,Consolas,monospace; }
+
+  .grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(330px,1fr)); gap:20px; }
+
+  .card {
+    background:var(--panel); border:1px solid var(--line); border-radius:14px;
+    overflow:hidden; box-shadow:0 5px 18px rgba(80,66,48,.10);
+  }
+  .stage {
+    display:flex; align-items:center; gap:18px; padding:26px 22px;
+    border-bottom:1px solid var(--line2); min-height:120px;
+  }
+  /* second swatch: the mark reversed on a dark chip, to test contrast */
+  .chip {
+    margin-left:auto; display:flex; align-items:center; justify-content:center;
+    width:64px; height:64px; border-radius:12px; background:#2c2925; flex:none;
+  }
+  .lockup { display:flex; align-items:center; gap:12px; }
+  .wordmark { font-size:26px; font-weight:600; letter-spacing:-.01em; color:var(--ink); }
+  .wordmark .dim { color:var(--dim); font-weight:400; }
+  svg { display:block; }
+
+  .meta { padding:13px 18px 16px; }
+  .meta .n { font-size:11px; color:var(--accent2); }
+  .meta .name { font-size:14px; font-weight:600; margin:1px 0 4px; }
+  .meta .desc { font-size:12px; color:var(--muted); line-height:1.5; }
+
+  .head-row { display:flex; align-items:baseline; gap:8px; }
+</style>
+</head>
+<body>
+  <h1>Noscia — logo exploration</h1>
+  <p class="lede">
+    Ten deliberately different directions for an ESG neural-search mark — from a literal
+    search-lens-with-sprout, through monograms and abstract neural/graph marks, to a pure
+    wordmark. Each shows the mark at logo size, a full lockup with the name, and a reversed
+    version on a dark chip (to check it holds on both). Caramel = accent, sage = the ESG/leaf
+    cue. Tell me the number(s) you like and I’ll refine + export SVG/favicon assets.
+  </p>
+
+  <div class="grid">
+
+    <!-- 1 · Sprout-lens : combination mark, the most literal -->
+    <div class="card">
+      <div class="stage">
+        <svg width="56" height="56" viewBox="0 0 48 48" fill="none">
+          <circle cx="20" cy="20" r="13" stroke="var(--accent)" stroke-width="3"/>
+          <line x1="29.5" y1="29.5" x2="41" y2="41" stroke="var(--ink)" stroke-width="4" stroke-linecap="round"/>
+          <path d="M20 26 V16" stroke="var(--leaf)" stroke-width="2.4" stroke-linecap="round"/>
+          <path d="M20 18.5c0-3 2.3-5 5.2-5.2-.2 3-2.2 5-5.2 5.2Z" fill="var(--leaf)"/>
+          <path d="M20 21c0-2.6-2-4.4-4.6-4.6.2 2.6 2 4.4 4.6 4.6Z" fill="var(--leaf)" opacity=".75"/>
+        </svg>
+        <div class="lockup"><span class="wordmark">Noscia</span></div>
+        <div class="chip">
+          <svg width="40" height="40" viewBox="0 0 48 48" fill="none">
+            <circle cx="20" cy="20" r="13" stroke="#e6a86f" stroke-width="3"/>
+            <line x1="29.5" y1="29.5" x2="41" y2="41" stroke="#f0e8da" stroke-width="4" stroke-linecap="round"/>
+            <path d="M20 26 V16" stroke="#9fb07e" stroke-width="2.4" stroke-linecap="round"/>
+            <path d="M20 18.5c0-3 2.3-5 5.2-5.2-.2 3-2.2 5-5.2 5.2Z" fill="#9fb07e"/>
+            <path d="M20 21c0-2.6-2-4.4-4.6-4.6.2 2.6 2 4.4 4.6 4.6Z" fill="#9fb07e" opacity=".75"/>
+          </svg>
+        </div>
+      </div>
+      <div class="meta">
+        <div class="head-row"><span class="n mono">01</span><span class="name">Sprout-lens</span></div>
+        <div class="desc">The literal read: a search magnifier with a young plant in the glass. Search + sustainability in one glance. Friendly, product-y.</div>
+      </div>
+    </div>
+
+    <!-- 2 · Neural-N : nodes + edges form the letter -->
+    <div class="card">
+      <div class="stage">
+        <svg width="56" height="56" viewBox="0 0 48 48" fill="none">
+          <g stroke="var(--accent)" stroke-width="2.4">
+            <line x1="11" y1="37" x2="11" y2="11"/>
+            <line x1="11" y1="11" x2="37" y2="37"/>
+            <line x1="37" y1="37" x2="37" y2="11"/>
+          </g>
+          <g fill="var(--ink)">
+            <circle cx="11" cy="11" r="4"/><circle cx="11" cy="37" r="4"/>
+            <circle cx="37" cy="11" r="4"/><circle cx="37" cy="37" r="4"/>
+            <circle cx="24" cy="24" r="3.4" fill="var(--accent)"/>
+          </g>
+        </svg>
+        <div class="lockup"><span class="wordmark">Noscia</span></div>
+        <div class="chip">
+          <svg width="40" height="40" viewBox="0 0 48 48" fill="none">
+            <g stroke="#e6a86f" stroke-width="2.4">
+              <line x1="11" y1="37" x2="11" y2="11"/><line x1="11" y1="11" x2="37" y2="37"/><line x1="37" y1="37" x2="37" y2="11"/>
+            </g>
+            <g fill="#f0e8da">
+              <circle cx="11" cy="11" r="4"/><circle cx="11" cy="37" r="4"/><circle cx="37" cy="11" r="4"/><circle cx="37" cy="37" r="4"/>
+              <circle cx="24" cy="24" r="3.4" fill="#e6a86f"/>
+            </g>
+          </svg>
+        </div>
+      </div>
+      <div class="meta">
+        <div class="head-row"><span class="n mono">02</span><span class="name">Neural-N</span></div>
+        <div class="desc">An “N” drawn as a node-edge graph — the neural/embedding retrieval made visible. Technical, on-message for “neural search”.</div>
+      </div>
+    </div>
+
+    <!-- 3 · Orbit seed : minimal abstract -->
+    <div class="card">
+      <div class="stage">
+        <svg width="56" height="56" viewBox="0 0 48 48" fill="none">
+          <ellipse cx="24" cy="24" rx="18" ry="8" transform="rotate(-30 24 24)" stroke="var(--accent)" stroke-width="2.2"/>
+          <circle cx="24" cy="24" r="5" fill="var(--leaf)"/>
+          <circle cx="38.2" cy="16" r="2.6" fill="var(--accent2)"/>
+        </svg>
+        <div class="lockup"><span class="wordmark">Noscia</span></div>
+        <div class="chip">
+          <svg width="40" height="40" viewBox="0 0 48 48" fill="none">
+            <ellipse cx="24" cy="24" rx="18" ry="8" transform="rotate(-30 24 24)" stroke="#e6a86f" stroke-width="2.2"/>
+            <circle cx="24" cy="24" r="5" fill="#9fb07e"/>
+            <circle cx="38.2" cy="16" r="2.6" fill="#e6a86f"/>
+          </svg>
+        </div>
+      </div>
+      <div class="meta">
+        <div class="head-row"><span class="n mono">03</span><span class="name">Orbit seed</span></div>
+        <div class="desc">A seed on an orbit — knowledge circling a core. Abstract, minimal, scales tiny. Reads as a “system”, less literal.</div>
+      </div>
+    </div>
+
+    <!-- 4 · Signal : concentric query waves -->
+    <div class="card">
+      <div class="stage">
+        <svg width="56" height="56" viewBox="0 0 48 48" fill="none">
+          <circle cx="16" cy="32" r="4" fill="var(--accent)"/>
+          <path d="M22 32a6 6 0 0 0-6-6" stroke="var(--ink)" stroke-width="2.4" stroke-linecap="round"/>
+          <path d="M28 32a12 12 0 0 0-12-12" stroke="var(--ink)" stroke-width="2.4" stroke-linecap="round" opacity=".7"/>
+          <path d="M34 32a18 18 0 0 0-18-18" stroke="var(--leaf)" stroke-width="2.4" stroke-linecap="round" opacity=".55"/>
+        </svg>
+        <div class="lockup"><span class="wordmark">Noscia</span></div>
+        <div class="chip">
+          <svg width="40" height="40" viewBox="0 0 48 48" fill="none">
+            <circle cx="16" cy="32" r="4" fill="#e6a86f"/>
+            <path d="M22 32a6 6 0 0 0-6-6" stroke="#f0e8da" stroke-width="2.4" stroke-linecap="round"/>
+            <path d="M28 32a12 12 0 0 0-12-12" stroke="#f0e8da" stroke-width="2.4" stroke-linecap="round" opacity=".7"/>
+            <path d="M34 32a18 18 0 0 0-18-18" stroke="#9fb07e" stroke-width="2.4" stroke-linecap="round" opacity=".6"/>
+          </svg>
+        </div>
+      </div>
+      <div class="meta">
+        <div class="head-row"><span class="n mono">04</span><span class="name">Signal</span></div>
+        <div class="desc">Query waves radiating from a point — retrieval reaching outward across the corpus. Energetic, suggests “search” without a lens.</div>
+      </div>
+    </div>
+
+    <!-- 5 · Leaf-N : letterform from a leaf -->
+    <div class="card">
+      <div class="stage">
+        <svg width="56" height="56" viewBox="0 0 48 48" fill="none">
+          <line x1="12" y1="38" x2="12" y2="10" stroke="var(--ink)" stroke-width="3.4" stroke-linecap="round"/>
+          <line x1="36" y1="38" x2="36" y2="10" stroke="var(--ink)" stroke-width="3.4" stroke-linecap="round"/>
+          <path d="M13 11C24 16 33 25 35 37 24 32 15 23 13 11Z" fill="var(--leaf)"/>
+          <path d="M14 13 33 35" stroke="var(--panel)" stroke-width="1.4" stroke-linecap="round" opacity=".6"/>
+        </svg>
+        <div class="lockup"><span class="wordmark">Noscia</span></div>
+        <div class="chip">
+          <svg width="40" height="40" viewBox="0 0 48 48" fill="none">
+            <line x1="12" y1="38" x2="12" y2="10" stroke="#f0e8da" stroke-width="3.4" stroke-linecap="round"/>
+            <line x1="36" y1="38" x2="36" y2="10" stroke="#f0e8da" stroke-width="3.4" stroke-linecap="round"/>
+            <path d="M13 11C24 16 33 25 35 37 24 32 15 23 13 11Z" fill="#9fb07e"/>
+            <path d="M14 13 33 35" stroke="#2c2925" stroke-width="1.4" stroke-linecap="round" opacity=".5"/>
+          </svg>
+        </div>
+      </div>
+      <div class="meta">
+        <div class="head-row"><span class="n mono">05</span><span class="name">Leaf-N</span></div>
+        <div class="desc">The diagonal of the “N” becomes a leaf with a vein. Monogram that wears its ESG domain literally but stays elegant.</div>
+      </div>
+    </div>
+
+    <!-- 6 · Strata : stacked corpus layers -->
+    <div class="card">
+      <div class="stage">
+        <svg width="56" height="56" viewBox="0 0 48 48" fill="none">
+          <rect x="9" y="30" width="30" height="7" rx="3.5" fill="var(--ink)"/>
+          <rect x="13" y="20.5" width="26" height="7" rx="3.5" fill="var(--accent)"/>
+          <rect x="18" y="11" width="22" height="7" rx="3.5" fill="var(--leaf)"/>
+        </svg>
+        <div class="lockup"><span class="wordmark">Noscia</span></div>
+        <div class="chip">
+          <svg width="40" height="40" viewBox="0 0 48 48" fill="none">
+            <rect x="9" y="30" width="30" height="7" rx="3.5" fill="#f0e8da"/>
+            <rect x="13" y="20.5" width="26" height="7" rx="3.5" fill="#e6a86f"/>
+            <rect x="18" y="11" width="22" height="7" rx="3.5" fill="#9fb07e"/>
+          </svg>
+        </div>
+      </div>
+      <div class="meta">
+        <div class="head-row"><span class="n mono">06</span><span class="name">Strata</span></div>
+        <div class="desc">Stacked, ranked layers — the curated index / cited results, ascending. Calm, structural, “ranked retrieval” feel. Very brandable.</div>
+      </div>
+    </div>
+
+    <!-- 7 · Locator : pin + lens hybrid -->
+    <div class="card">
+      <div class="stage">
+        <svg width="56" height="56" viewBox="0 0 48 48" fill="none">
+          <path d="M24 7c8.3 0 15 6.5 15 14.6C39 32 24 42 24 42S9 32 9 21.6C9 13.5 15.7 7 24 7Z" stroke="var(--accent)" stroke-width="3" fill="var(--accent-soft)"/>
+          <circle cx="24" cy="21" r="6.5" stroke="var(--ink)" stroke-width="2.4"/>
+          <line x1="28.6" y1="25.6" x2="33" y2="30" stroke="var(--ink)" stroke-width="2.4" stroke-linecap="round"/>
+        </svg>
+        <div class="lockup"><span class="wordmark">Noscia</span></div>
+        <div class="chip">
+          <svg width="40" height="40" viewBox="0 0 48 48" fill="none">
+            <path d="M24 7c8.3 0 15 6.5 15 14.6C39 32 24 42 24 42S9 32 9 21.6C9 13.5 15.7 7 24 7Z" stroke="#e6a86f" stroke-width="3" fill="rgba(230,168,111,.16)"/>
+            <circle cx="24" cy="21" r="6.5" stroke="#f0e8da" stroke-width="2.4"/>
+            <line x1="28.6" y1="25.6" x2="33" y2="30" stroke="#f0e8da" stroke-width="2.4" stroke-linecap="round"/>
+          </svg>
+        </div>
+      </div>
+      <div class="meta">
+        <div class="head-row"><span class="n mono">07</span><span class="name">Locator</span></div>
+        <div class="desc">A map-pin holding a search lens — “find the exact, cited source”. Leans into precise retrieval / provenance. App-icon-ready.</div>
+      </div>
+    </div>
+
+    <!-- 8 · Molecule : hex emblem -->
+    <div class="card">
+      <div class="stage">
+        <svg width="56" height="56" viewBox="0 0 48 48" fill="none">
+          <path d="M24 5 39 13.5V30.5L24 39 9 30.5V13.5Z" stroke="var(--line)" stroke-width="2" fill="var(--field)"/>
+          <g stroke="var(--accent)" stroke-width="2">
+            <line x1="24" y1="24" x2="24" y2="14"/><line x1="24" y1="24" x2="32" y2="29"/><line x1="24" y1="24" x2="16" y2="29"/>
+          </g>
+          <g fill="var(--ink)">
+            <circle cx="24" cy="24" r="3.6" fill="var(--accent)"/>
+            <circle cx="24" cy="14" r="3" fill="var(--leaf)"/>
+            <circle cx="32" cy="29" r="3"/><circle cx="16" cy="29" r="3"/>
+          </g>
+        </svg>
+        <div class="lockup"><span class="wordmark">Noscia</span></div>
+        <div class="chip">
+          <svg width="40" height="40" viewBox="0 0 48 48" fill="none">
+            <path d="M24 5 39 13.5V30.5L24 39 9 30.5V13.5Z" stroke="#5a554d" stroke-width="2" fill="#2c2925"/>
+            <g stroke="#e6a86f" stroke-width="2">
+              <line x1="24" y1="24" x2="24" y2="14"/><line x1="24" y1="24" x2="32" y2="29"/><line x1="24" y1="24" x2="16" y2="29"/>
+            </g>
+            <g fill="#f0e8da">
+              <circle cx="24" cy="24" r="3.6" fill="#e6a86f"/><circle cx="24" cy="14" r="3" fill="#9fb07e"/>
+              <circle cx="32" cy="29" r="3"/><circle cx="16" cy="29" r="3"/>
+            </g>
+          </svg>
+        </div>
+      </div>
+      <div class="meta">
+        <div class="head-row"><span class="n mono">08</span><span class="name">Molecule</span></div>
+        <div class="desc">A hex emblem with a bonded node cluster — science + structured knowledge. Serious, enterprise; the badge shape suits favicons.</div>
+      </div>
+    </div>
+
+    <!-- 9 · Aperture : petals / focus -->
+    <div class="card">
+      <div class="stage">
+        <svg width="56" height="56" viewBox="0 0 48 48" fill="none">
+          <g>
+            <g fill="var(--accent)" opacity=".9">
+              <path d="M24 24 24 8a16 16 0 0 1 13.9 8Z"/>
+              <path d="M24 24 37.9 16a16 16 0 0 1 0 16Z" opacity=".82"/>
+              <path d="M24 24 37.9 32A16 16 0 0 1 24 40Z" opacity=".64"/>
+            </g>
+            <g fill="var(--leaf)" opacity=".9">
+              <path d="M24 24 24 40a16 16 0 0 1-13.9-8Z"/>
+              <path d="M24 24 10.1 32a16 16 0 0 1 0-16Z" opacity=".82"/>
+              <path d="M24 24 10.1 16A16 16 0 0 1 24 8Z" opacity=".64"/>
+            </g>
+            <circle cx="24" cy="24" r="4.5" fill="var(--field)"/>
+          </g>
+        </svg>
+        <div class="lockup"><span class="wordmark">Noscia</span></div>
+        <div class="chip">
+          <svg width="40" height="40" viewBox="0 0 48 48" fill="none">
+            <g fill="#e6a86f" opacity=".95">
+              <path d="M24 24 24 8a16 16 0 0 1 13.9 8Z"/><path d="M24 24 37.9 16a16 16 0 0 1 0 16Z" opacity=".82"/><path d="M24 24 37.9 32A16 16 0 0 1 24 40Z" opacity=".64"/>
+            </g>
+            <g fill="#9fb07e" opacity=".95">
+              <path d="M24 24 24 40a16 16 0 0 1-13.9-8Z"/><path d="M24 24 10.1 32a16 16 0 0 1 0-16Z" opacity=".82"/><path d="M24 24 10.1 16A16 16 0 0 1 24 8Z" opacity=".64"/>
+            </g>
+            <circle cx="24" cy="24" r="4.5" fill="#2c2925"/>
+          </g>
+        </svg>
+      </div>
+      <div class="meta">
+        <div class="head-row"><span class="n mono">09</span><span class="name">Aperture</span></div>
+        <div class="desc">A camera aperture that doubles as a flower — focus + nature, two-tone caramel/sage. Most “designed”, works beautifully as an app icon.</div>
+      </div>
+    </div>
+
+    <!-- 10 · Wordmark : type-only, the i-dot is a result -->
+    <div class="card">
+      <div class="stage">
+        <div class="lockup" style="gap:0">
+          <span class="wordmark" style="font-size:34px; letter-spacing:-.015em;">nosc<span style="position:relative; display:inline-block;">i<span style="position:absolute; left:50%; top:-2px; transform:translateX(-50%); width:7px; height:7px; border-radius:50%; background:var(--accent);"></span></span>a</span>
+        </div>
+        <div class="chip">
+          <span class="wordmark mono" style="font-size:30px; color:#f0e8da; position:relative;">N<span style="position:absolute; right:-3px; top:2px; width:7px; height:7px; border-radius:50%; background:#e6a86f;"></span></span>
+        </div>
+      </div>
+      <div class="meta">
+        <div class="head-row"><span class="n mono">10</span><span class="name">Wordmark</span></div>
+        <div class="desc">Type-only. The dot over the “i” becomes an accent pin — the single best cited result. No icon to maintain; relies on a clean lockup. (Mark chip shows the “N” + dot favicon cut-down.)</div>
+      </div>
+    </div>
+
+  </div>
+</body>
+</html>

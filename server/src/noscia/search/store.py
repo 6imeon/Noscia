@@ -15,6 +15,7 @@ from __future__ import annotations
 
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
+from datetime import datetime
 
 from sqlalchemy import text
 from sqlalchemy.engine import Engine
@@ -42,6 +43,7 @@ class Chunk:
     content_hash: str = ""
     token_count: int | None = None
     fresh: bool = False  # crawled recently (set on read; see SQL)
+    published_at: datetime | None = None  # document publish date (None = unknown); drives recency
 
 
 @dataclass
@@ -75,6 +77,7 @@ def _row_to_hit(row, score: float) -> Hit:
             org=row.org,
             content_hash=getattr(row, "content_hash", ""),
             fresh=bool(getattr(row, "fresh", False)),
+            published_at=getattr(row, "published_at", None),
             dense=[],  # not re-hydrated on read; not needed downstream
         ),
         score=score,
@@ -117,6 +120,14 @@ class VectorStore(ABC):
         """
 
     @abstractmethod
+    def stamp_published_at(self, url: str, published_at: datetime) -> int:
+        """Set ``published_at`` on every chunk of a page (publication date is page-level).
+
+        Lets an *incremental* recrawl backfill the date even on chunks whose content
+        didn't change (so the per-chunk hash diff skipped their upsert). Returns rows set.
+        """
+
+    @abstractmethod
     def count(self) -> int:
         """Total indexed chunks (Corpus view stat / rail counter)."""
 
@@ -124,9 +135,9 @@ class VectorStore(ABC):
 _UPSERT_SQL = text(
     """
     INSERT INTO chunks (id, url, source_url, title, org, source_type, text,
-                        content_hash, token_count, dense)
+                        content_hash, token_count, dense, published_at)
     VALUES (:id, :url, :source_url, :title, :org, :source_type, :text, :content_hash, :token_count,
-            CAST(:dense AS vector(256)))
+            CAST(:dense AS vector(256)), :published_at)
     ON CONFLICT (id) DO UPDATE SET
         url = EXCLUDED.url,
         source_url = EXCLUDED.source_url,
@@ -137,6 +148,7 @@ _UPSERT_SQL = text(
         content_hash = EXCLUDED.content_hash,
         token_count = EXCLUDED.token_count,
         dense = EXCLUDED.dense,
+        published_at = EXCLUDED.published_at,
         crawled_at = now()
     """
 )
@@ -168,6 +180,7 @@ _HYBRID_SQL = text(
         FROM dense d FULL OUTER JOIN lexical l ON d.id = l.id
     )
     SELECT c.id, c.url, c.title, c.org, c.source_type, c.text, c.content_hash,
+           c.published_at,
            (c.crawled_at > now() - interval '7 days') AS fresh,
            f.rrf AS score, f.in_dense, f.in_lex
     FROM fused f JOIN chunks c ON c.id = f.id
@@ -179,6 +192,7 @@ _HYBRID_SQL = text(
 _DENSE_SQL = text(
     """
     SELECT id, url, title, org, source_type, text, content_hash,
+           published_at,
            (crawled_at > now() - interval '7 days') AS fresh,
            1.0 - (dense <=> CAST(:qvec AS vector(256))) AS score
     FROM chunks
@@ -209,6 +223,7 @@ class PgVectorStore(VectorStore):
                 "content_hash": c.content_hash,
                 "token_count": c.token_count,
                 "dense": _vec_literal(c.dense),
+                "published_at": c.published_at,
             }
             for c in chunks
         ]
@@ -270,6 +285,17 @@ class PgVectorStore(VectorStore):
                     "WHERE source_url = :src AND NOT (url = ANY(:keep))"
                 ),
                 {"src": source_url, "keep": keep_urls},
+            )
+            return res.rowcount or 0
+
+    def stamp_published_at(self, url: str, published_at: datetime) -> int:
+        with self._engine.begin() as conn:
+            res = conn.execute(
+                text(
+                    "UPDATE chunks SET published_at = :ts "
+                    "WHERE url = :url AND published_at IS DISTINCT FROM :ts"
+                ),
+                {"url": url, "ts": published_at},
             )
             return res.rowcount or 0
 
