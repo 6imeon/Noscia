@@ -187,15 +187,19 @@ Build Phase 1 thin and end-to-end first (a handful of seed URLs, one query, visi
 - [x] `train/eval.py` — nDCG@10 / MRR / Recall@10, fine-tuned vs base; **ship only if it wins** (rule 9)
 - [x] Incremental crawl: `ETag`/`If-Modified-Since` (304 short-circuit) + `content_hash` diff (re-embed only changed chunks)
 - [x] Adaptive recrawl cadence per source (`sources_due()` / `--due`); upsert deltas only; delete vanished chunks
+- [x] **Deep crawl (Phase 2.5):** `crawl.py::crawl_site` bounded same-domain BFS (`max_depth`/`max_pages`/exclude per seed); seeds expanded 8 → 21 authoritative domains; `chunks.source_url` + source-level page prune; **578-page / 2,593-chunk** index. Depth, not open-web (rule 11/13).
+- [x] **Content quality:** `PruningContentFilter` + `excluded_tags` + `excluded_selector` (Cookiebot/OneTrust) + chunk-level boilerplate filter → **0 cookie-polluted chunks**. Rejected `remove_overlay_elements` (deletes ghgprotocol content) and JS accept-click (leaves Cookiebot declaration table in DOM) after A/B.
+- [x] Eval re-grounded to **source-domain** relevance (deep-crawl sub-pages + recrawl URL churn no longer perturb the gate); labels unchanged (domains stable)
 - [x] ~~Live-search fallback (BYOK Exa/Tavily/Firecrawl)~~ — **dropped** (rule 13: no third-party search providers / no external data egress). Freshness is index-only via incremental crawl.
 - [ ] *(Optional)* ColBERT + MUVERA late-interaction path behind an opt-in toggle — only if it beats fine-tuned single-vector on eval
-- [ ] **DoD:** recrawl re-embeds only changed chunks ✓; fine-tune pipeline runs + is eval-gated ✓ (eval saturated on the 8-doc demo corpus — see note); no live fallback (by decision)
+- [ ] **DoD:** recrawl re-embeds only changed chunks ✓; deep crawl yields a ~300–500-page curated index ✓; fine-tune pipeline runs + is eval-gated ✓; no live fallback (by decision)
 
-> **Eval-saturation note.** On the current 8-doc demo corpus, URL-level retrieval is
-> already near-perfect (nDCG@10 ≈ 0.99, MRR/Recall = 1.000), so a fine-tuned embedder
-> cannot demonstrate a win — per rule 9 it does **not** ship until the corpus grows
-> enough for the eval to discriminate. The full synth → fine-tune → compare pipeline is
-> built and runs; the gate is honest, not the result.
+> **Eval-saturation note.** Authored on the 8-doc demo corpus, where URL-level retrieval
+> was near-perfect (nDCG@10 ≈ 0.99, MRR/Recall = 1.000) so a fine-tuned embedder couldn't
+> show a win. Phase 2.5's deep crawl grows the corpus to ~300–500 pages and the eval now
+> scores at source-domain level; re-check whether the gate discriminates before shipping
+> any fine-tune (rule 9). The full synth → fine-tune → compare pipeline is built and runs;
+> the gate is honest, not the result.
 
 ### Phase 3 — ESG entity search (showpiece)
 - [ ] `agent/schema.py` — declarative company entity schema (SPEC §9), every field nullable + evidence link

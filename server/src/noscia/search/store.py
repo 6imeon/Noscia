@@ -32,12 +32,13 @@ RRF_K = 60  # Reciprocal Rank Fusion constant (standard default)
 @dataclass
 class Chunk:
     id: str  # stable id; upsert key (content-addressed)
-    url: str
+    url: str  # the page this chunk came from (citation target)
     title: str
     text: str
     source_type: str
     dense: list[float]  # EMBED_DIM-length vector
     org: str | None = None
+    source_url: str | None = None  # the seed this page was discovered under (deep crawl)
     content_hash: str = ""
     token_count: int | None = None
     fresh: bool = False  # crawled recently (set on read; see SQL)
@@ -108,17 +109,27 @@ class VectorStore(ABC):
         """``{chunk_id: content_hash}`` for a page — the diff base for incremental crawl."""
 
     @abstractmethod
+    def prune_pages(self, source_url: str, keep_urls: list[str]) -> int:
+        """Deep crawl: drop chunks under a seed whose page URL is no longer reachable.
+
+        After a site recrawl, any page not in ``keep_urls`` has vanished (de-linked or
+        gone); remove its chunks. Returns rows removed.
+        """
+
+    @abstractmethod
     def count(self) -> int:
         """Total indexed chunks (Corpus view stat / rail counter)."""
 
 
 _UPSERT_SQL = text(
     """
-    INSERT INTO chunks (id, url, title, org, source_type, text, content_hash, token_count, dense)
-    VALUES (:id, :url, :title, :org, :source_type, :text, :content_hash, :token_count,
+    INSERT INTO chunks (id, url, source_url, title, org, source_type, text,
+                        content_hash, token_count, dense)
+    VALUES (:id, :url, :source_url, :title, :org, :source_type, :text, :content_hash, :token_count,
             CAST(:dense AS vector(256)))
     ON CONFLICT (id) DO UPDATE SET
         url = EXCLUDED.url,
+        source_url = EXCLUDED.source_url,
         title = EXCLUDED.title,
         org = EXCLUDED.org,
         source_type = EXCLUDED.source_type,
@@ -190,6 +201,7 @@ class PgVectorStore(VectorStore):
             {
                 "id": c.id,
                 "url": c.url,
+                "source_url": c.source_url,
                 "title": c.title,
                 "org": c.org,
                 "source_type": c.source_type,
@@ -249,6 +261,17 @@ class PgVectorStore(VectorStore):
                 text("SELECT id, content_hash FROM chunks WHERE url = :url"), {"url": url}
             ).all()
         return {r.id: r.content_hash for r in rows}
+
+    def prune_pages(self, source_url: str, keep_urls: list[str]) -> int:
+        with self._engine.begin() as conn:
+            res = conn.execute(
+                text(
+                    "DELETE FROM chunks "
+                    "WHERE source_url = :src AND NOT (url = ANY(:keep))"
+                ),
+                {"src": source_url, "keep": keep_urls},
+            )
+            return res.rowcount or 0
 
     def count(self) -> int:
         with self._engine.connect() as conn:

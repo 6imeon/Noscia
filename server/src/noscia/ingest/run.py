@@ -6,14 +6,21 @@ The one place the write pipeline is composed. Exposed several ways:
   * ``ingest_specs(...)``                  — awaited by the Corpus API endpoints,
   * ``register_seeds()``                   — load the YAML into the `sources` table.
 
-**Phase 2 incremental crawl.** Two layers of freshness keep recrawls cheap:
-  1. a conditional HTTP probe (``If-None-Match`` / ``If-Modified-Since``) — a ``304``
-     skips the browser render entirely; and
-  2. a per-chunk ``content_hash`` diff — only changed/new chunks are re-embedded,
-     vanished chunks are pruned, unchanged chunks are left untouched.
+**Phase 2.5 deep crawl.** A seed is no longer one page — it's a *site section*. Each
+seed runs a bounded, same-domain BFS (``crawl_site``: ``max_depth`` / ``max_pages``
+from its ``crawl:`` block) so an authoritative domain contributes its real sub-pages,
+not just a landing page. Every chunk records the page it came from (``url``, the
+citation target) and the seed it was discovered under (``source_url``).
+
+**Incremental freshness** keeps recrawls cheap on three levels:
+  1. single-page seeds (``max_depth: 0``) keep the conditional HTTP probe
+     (``If-None-Match`` / ``If-Modified-Since``) — a ``304`` skips the render. Deep
+     seeds always crawl (a landing-page ``304`` says nothing about sub-pages);
+  2. a per-chunk ``content_hash`` diff — only changed/new chunks are re-embedded; and
+  3. a per-seed page prune — chunks under a seed whose page has vanished are dropped.
 
 Chunk ids are position-stable (``sha256(url#ordinal)``) so the diff lands in place.
-Source status walks idle → crawling → done|error for the UI.
+Source status walks idle → crawling → done|error for the UI; counts roll up per seed.
 """
 
 from __future__ import annotations
@@ -30,9 +37,24 @@ from .. import corpus, db
 from ..search.embed import embed_docs
 from ..search.store import Chunk, get_store
 from .chunk import chunk_markdown
-from .crawl import CrawledPage, check_conditional, crawl_many
+from .crawl import CrawledPage, check_conditional, crawl_many, crawl_site
 
 SEEDS_PATH = Path(__file__).resolve().parents[4] / "corpus" / "seeds.esg.yaml"
+
+# Deep-crawl defaults (per-seed `crawl:` block in the YAML overrides these).
+DEFAULT_MAX_DEPTH = 1  # 0 = single page (just the seed)
+DEFAULT_MAX_PAGES = 25
+
+# Junk paths every deep crawl skips (login/search/taxonomy/legal pages and feeds) —
+# they carry no ESG substance and invite crawler traps. Globs; reverse-matched.
+DEFAULT_EXCLUDE = [
+    "*/login*", "*/signin*", "*/sign-in*", "*/search*", "*/account*",
+    "*/tag/*", "*/tags/*", "*/category/*", "*/author/*",
+    "*/feed*", "*/cart*", "*/privacy*", "*/cookie*", "*/terms*",
+    # low-value nav/marketing pages — no ESG substance
+    "*/contact*", "*/careers*", "*/jobs*", "*/join-our-team*",
+    "*/donate*", "*/subscribe*", "*/newsletter*",
+]
 
 
 def load_seeds() -> list[dict]:
@@ -67,12 +89,16 @@ class PageResult:
     error: str | None = None
 
 
-def _index_page(page: CrawledPage, spec: dict) -> PageResult:
-    """Diff a freshly crawled page against the index; embed only what changed."""
+def _index_page(page: CrawledPage, spec: dict, source_url: str) -> PageResult:
+    """Diff one crawled page against the index; embed only what changed.
+
+    Page-scoped: upserts changed/new chunks, prunes chunks that vanished *within* the
+    page. Source status/counts are owned by the seed orchestrator (``_ingest_seed``),
+    not here — one seed now fans out to many pages.
+    """
     store = get_store()
     text_chunks = chunk_markdown(page.markdown)
     if not text_chunks:
-        corpus.set_status(page.url, "error", "no text after chunking")
         return PageResult(url=page.url, error="no text after chunking")
 
     existing = store.existing_hashes(page.url)  # {chunk_id: content_hash}
@@ -89,6 +115,7 @@ def _index_page(page: CrawledPage, spec: dict) -> PageResult:
         Chunk(
             id=cid,
             url=page.url,
+            source_url=source_url,
             title=page.title,
             text=tc.text,
             source_type=spec["source_type"],
@@ -104,7 +131,6 @@ def _index_page(page: CrawledPage, spec: dict) -> PageResult:
     store.delete_ids(vanished)
 
     total = len(text_chunks)
-    corpus.finish_source(page.url, pages=1, chunks=total)
     return PageResult(
         url=page.url,
         changed=len(changed),
@@ -114,62 +140,98 @@ def _index_page(page: CrawledPage, spec: dict) -> PageResult:
     )
 
 
-async def ingest_specs(specs: list[dict], *, conditional: bool = True) -> dict:
-    """Crawl + incrementally index the given seed specs.
+def _crawl_config(spec: dict) -> tuple[int, int, list[str]]:
+    """Read a seed's ``crawl:`` block → (max_depth, max_pages, exclude globs)."""
+    crawl = spec.get("crawl") or {}
+    depth = int(crawl.get("max_depth", DEFAULT_MAX_DEPTH))
+    max_pages = int(crawl.get("max_pages", DEFAULT_MAX_PAGES))
+    exclude = DEFAULT_EXCLUDE + list(crawl.get("exclude") or [])
+    return depth, max_pages, exclude
 
-    With ``conditional`` (default), a cheap HTTP validator probe short-circuits
-    unchanged pages with a ``304`` before the expensive browser render.
-    """
-    by_url = {s["url"]: s for s in specs}
-    for s in specs:
-        corpus.set_status(s["url"], "crawling")
 
-    # 1. Conditional probes — concurrent, cheap; a 304 skips the render.
-    not_modified = 0
-    to_crawl: list[str] = list(by_url)
-    fresh_validators: dict[str, tuple[str | None, str | None]] = {}
-    if conditional:
-        probes = await asyncio.gather(
-            *(check_conditional(url, *corpus.get_validators(url)) for url in by_url)
-        )
-        to_crawl = []
-        for url, cond in zip(by_url, probes, strict=True):
+async def _ingest_seed(spec: dict, *, conditional: bool) -> dict:
+    """Crawl + incrementally index one seed (single page or bounded deep crawl)."""
+    seed = spec["url"]
+    depth, max_pages, exclude = _crawl_config(spec)
+    corpus.set_status(seed, "crawling")
+
+    # Single-page seeds keep the cheap 304 short-circuit. Deep seeds always crawl —
+    # a landing-page 304 says nothing about its sub-pages — and lean on the hash diff.
+    fresh_validator: tuple[str | None, str | None] | None = None
+    if depth <= 0:
+        if conditional:
+            cond = await check_conditional(seed, *corpus.get_validators(seed))
             if cond.not_modified:
-                corpus.touch_unmodified(url)
-                not_modified += 1
-            else:
-                to_crawl.append(url)
-                if not cond.error:
-                    fresh_validators[url] = (cond.etag, cond.last_modified)
+                corpus.touch_unmodified(seed)
+                return {"not_modified": 1}
+            if not cond.error:
+                fresh_validator = (cond.etag, cond.last_modified)
+        pages = await crawl_many([seed])
+    else:
+        pages = await crawl_site(
+            seed, max_depth=depth, max_pages=max_pages, exclude_patterns=exclude
+        )
 
-    # 2. Full crawl + diff-index for everything that may have changed.
-    pages = await crawl_many(to_crawl)
-    results: list[PageResult] = []
-    errors: list[dict] = []
-    for page in pages:
-        spec = by_url[page.url]
-        if not page.ok:
-            corpus.set_status(page.url, "error", page.error)
-            errors.append({"url": page.url, "error": page.error})
-            continue
-        res = _index_page(page, spec)
-        if res.error:
-            errors.append({"url": res.url, "error": res.error})
-            continue
-        if page.url in fresh_validators:
-            corpus.save_validators(page.url, *fresh_validators[page.url])
-        results.append(res)
+    ok_pages = [p for p in pages if p.ok]
+    errors: list[dict] = [{"url": p.url, "error": p.error} for p in pages if not p.ok]
+
+    if not ok_pages:  # whole seed failed — leave the existing index untouched
+        msg = errors[0]["error"] if errors else "no pages crawled"
+        corpus.set_status(seed, "error", msg)
+        return {"errors": errors or [{"url": seed, "error": msg}]}
+
+    results = [_index_page(p, spec, seed) for p in ok_pages]
+    errors += [{"url": r.url, "error": r.error} for r in results if r.error]
+    indexed = [r for r in results if not r.error]
+
+    # Source-level page prune: chunks under this seed whose page is gone from the site.
+    removed_pages = get_store().prune_pages(seed, [r.url for r in indexed])
+
+    chunks = sum(r.chunks for r in indexed)
+    corpus.finish_source(seed, pages=len(indexed), chunks=chunks)
+    if fresh_validator is not None:
+        corpus.save_validators(seed, *fresh_validator)
 
     return {
-        "ok": not errors,
-        "indexed_pages": len(results),
-        "not_modified": not_modified,
-        "chunks": sum(r.chunks for r in results),
-        "changed_chunks": sum(r.changed for r in results),
-        "skipped_chunks": sum(r.skipped for r in results),
-        "removed_chunks": sum(r.removed for r in results),
+        "indexed_pages": len(indexed),
+        "chunks": chunks,
+        "changed_chunks": sum(r.changed for r in indexed),
+        "skipped_chunks": sum(r.skipped for r in indexed),
+        "removed_chunks": sum(r.removed for r in indexed) + removed_pages,
         "errors": errors,
     }
+
+
+async def ingest_specs(specs: list[dict], *, conditional: bool = True) -> dict:
+    """Crawl + incrementally index each seed spec, one seed at a time.
+
+    Seeds run sequentially (each deep crawl is already internally concurrent and
+    memory-adaptive — running several browsers at once would blow the 18 GB box).
+    ``conditional`` enables the 304 short-circuit for single-page seeds.
+    """
+    agg = {
+        "indexed_pages": 0,
+        "not_modified": 0,
+        "chunks": 0,
+        "changed_chunks": 0,
+        "skipped_chunks": 0,
+        "removed_chunks": 0,
+        "errors": [],
+    }
+    for spec in specs:
+        res = await _ingest_seed(spec, conditional=conditional)
+        for key in (
+            "indexed_pages",
+            "not_modified",
+            "chunks",
+            "changed_chunks",
+            "skipped_chunks",
+            "removed_chunks",
+        ):
+            agg[key] += res.get(key, 0)
+        agg["errors"].extend(res.get("errors", []))
+    agg["ok"] = not agg["errors"]
+    return agg
 
 
 async def ingest_all(*, conditional: bool = True) -> dict:

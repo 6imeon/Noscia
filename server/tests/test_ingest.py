@@ -1,7 +1,49 @@
 """Pure-function tests for the ingest/search building blocks (no models, no DB)."""
 
-from noscia.ingest.chunk import CHUNK_TOKENS, chunk_markdown, content_hash
+from noscia.ingest.chunk import CHUNK_TOKENS, _strip_boilerplate, chunk_markdown, content_hash
+from noscia.ingest.run import DEFAULT_EXCLUDE, DEFAULT_MAX_DEPTH, DEFAULT_MAX_PAGES, _crawl_config
 from noscia.search.highlight import highlight
+
+
+def test_strip_boilerplate_drops_cookie_and_consent_ui():
+    md = "\n".join([
+        "The Scope 2 Guidance standardizes how corporations measure emissions.",
+        "This website uses cookies to improve your experience.",  # cookie line
+        "Maximum Storage Duration : 1 year",                      # cookie-table cell
+        "Accept All Reject All",                                  # consent-UI phrase
+        "GRI Standards enable any organization to report impacts.",
+    ])
+    out = _strip_boilerplate(md)
+    assert "Scope 2 Guidance" in out and "GRI Standards enable" in out  # real content kept
+    assert "cookie" not in out.lower()
+    assert "Accept All" not in out
+    assert "Storage Duration" not in out
+
+
+def test_strip_boilerplate_keeps_fpic_consent():
+    # "consent" is a real ESG term (Free, Prior and Informed Consent) — must survive
+    md = "Free, Prior and Informed Consent (FPIC) protects indigenous land rights."
+    assert _strip_boilerplate(md) == md
+
+
+def test_crawl_config_defaults_when_block_absent():
+    depth, max_pages, exclude = _crawl_config({"url": "https://x"})
+    assert depth == DEFAULT_MAX_DEPTH
+    assert max_pages == DEFAULT_MAX_PAGES
+    assert exclude == DEFAULT_EXCLUDE  # global junk list, nothing extra
+
+
+def test_crawl_config_reads_and_merges_overrides():
+    spec = {"url": "https://x", "crawl": {"max_depth": 2, "max_pages": 40, "exclude": ["*/api/*"]}}
+    depth, max_pages, exclude = _crawl_config(spec)
+    assert (depth, max_pages) == (2, 40)
+    assert "*/api/*" in exclude  # per-seed extra appended …
+    assert set(DEFAULT_EXCLUDE) <= set(exclude)  # … on top of the global junk list
+
+
+def test_crawl_config_depth_zero_is_single_page():
+    depth, _, _ = _crawl_config({"url": "https://x", "crawl": {"max_depth": 0}})
+    assert depth == 0  # single-page seed keeps the 304 short-circuit path
 
 
 def test_chunking_sizes_and_hash_are_stable():

@@ -2,10 +2,12 @@
 
 Decides embedder/reranker swaps on the **ESG corpus**, not leaderboards. Runs the
 held-out queries in ``corpus/eval/esg_queries.jsonl`` through a retriever and reports
-**nDCG@10 / MRR / Recall@10**, scored at the **source-document (URL) level**: a query
-names the source page(s) that genuinely answer it, and a retrieved chunk counts as
-relevant when its URL is in that set (chunks are deduped to their best rank per URL,
-since several chunks of the same page shouldn't each earn credit).
+**nDCG@10 / MRR / Recall@10**, scored at the **source-domain level**: a query names the
+authoritative source(s) that genuinely answer it, and a retrieved chunk counts as
+relevant when its page's *domain* is in that set. Domain-level (not exact-URL) is
+deliberate — a seed now deep-crawls to many sub-pages, so "did we route to the right
+authoritative org" is the honest, churn-proof question; retrieved pages are deduped to
+their best rank per domain, since several pages of one source shouldn't each earn credit.
 
 A *retriever* is just ``Callable[[str, int], list[str]]`` → a ranked list of URLs.
 That seam is the point: Phase 2a compares the base vs fine-tuned embedder by passing
@@ -25,6 +27,7 @@ import math
 from collections.abc import Callable
 from dataclasses import dataclass
 from pathlib import Path
+from urllib.parse import urlparse
 
 # A retriever maps (query, k) → ranked URLs (best first), deduped to one per URL.
 Retriever = Callable[[str, int], list[str]]
@@ -95,19 +98,33 @@ def _dedupe_keep_order(urls: list[str]) -> list[str]:
     return ranked
 
 
+def _domain(url: str) -> str:
+    """Registrable host (sans leading ``www.``), lowercased — the relevance key.
+
+    Relevance is judged per authoritative source, so every page of a domain shares one
+    key; deep-crawl sub-pages and recrawl URL churn don't perturb the gate. A non-URL
+    string (the metric tests use bare ``"a"``/``"b"``) falls through to itself.
+    """
+    host = urlparse(url).netloc.lower()
+    if host.startswith("www."):
+        host = host[4:]
+    return host or url.strip().lower()
+
+
 def score_query(ranked_urls: list[str], relevant: set[str], k: int) -> QueryScore:
-    """Binary-relevance nDCG@k / MRR / Recall@k over a deduped URL ranking."""
-    ranked = _dedupe_keep_order(ranked_urls)[:k]
-    gains = [1.0 if u in relevant else 0.0 for u in ranked]
+    """Binary-relevance nDCG@k / MRR / Recall@k over a domain-deduped ranking."""
+    relevant_domains = {_domain(u) for u in relevant}
+    ranked = _dedupe_keep_order([_domain(u) for u in ranked_urls])[:k]
+    gains = [1.0 if d in relevant_domains else 0.0 for d in ranked]
 
     dcg = sum(g / math.log2(i + 2) for i, g in enumerate(gains))
-    ideal_hits = min(len(relevant), k)
+    ideal_hits = min(len(relevant_domains), k)
     idcg = sum(1.0 / math.log2(i + 2) for i in range(ideal_hits))
     ndcg = dcg / idcg if idcg else 0.0
 
     first_rank = next((i + 1 for i, g in enumerate(gains) if g), None)
     mrr = 1.0 / first_rank if first_rank else 0.0
-    recall = (sum(gains) / len(relevant)) if relevant else 0.0
+    recall = (sum(gains) / len(relevant_domains)) if relevant_domains else 0.0
     return QueryScore(id="", query="", ndcg=ndcg, mrr=mrr, recall=recall, first_rank=first_rank)
 
 

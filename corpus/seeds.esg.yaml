@@ -1,51 +1,138 @@
-# Noscia ESG corpus seeds (Phase 1).
+# Noscia ESG corpus seeds.
 #
-# Curated, narrow, vertical — quality over coverage (CLAUDE.md rule 11). Each seed
-# is one page that crawls cleanly to substantial markdown. `source_type` MUST be one
-# of the contract's SourceType literals (framework | regulator | ratings | report |
-# ngo | news) — it drives the §8.2 color tokens in the UI. `cadence` is the intended
-# recrawl rhythm (Phase 2 acts on it; Phase 1 records it for the Corpus view).
+# Curated, narrow, vertical — quality over coverage (CLAUDE.md rule 11). Every seed
+# is an *authoritative ESG domain*: a standard-setter, regulator, ratings provider,
+# NGO/target-setter, or domain newswire. We never crawl the open web (rule 13) — depth
+# comes from following each authoritative site's own internal links, nothing else.
 #
-# Keep this list small and authoritative. Add seeds via the Corpus view (Phase 1)
-# or by editing here, then `uv run python -m noscia.ingest.run`.
+# `source_type` MUST be one of the contract's SourceType literals (framework |
+# regulator | ratings | report | ngo | news) — it drives the §8.2 color tokens in the
+# UI. `cadence` is the recrawl rhythm (Phase 2 acts on it; frameworks churn slowly,
+# ratings/news fast).
+#
+# `crawl:` (optional) bounds the per-seed deep crawl:
+#   max_depth : link-follow depth from the seed. 0 = just the seed page.
+#   max_pages : hard cap on pages for this seed (BFS stops here).
+#   exclude   : extra glob patterns to skip, on top of the global junk list
+#               (login/search/taxonomy/legal — see ingest/run.py DEFAULT_EXCLUDE).
+# Omit `crawl:` to take the defaults (depth 1, 25 pages). Same-domain only, non-HTML
+# (PDFs etc.) dropped automatically. Total caps here target a ~300–500 page index.
+#
+# Add seeds via the Corpus view or by editing here, then
+# `uv run python -m noscia.ingest.run` (or `--due` for cadence-only recrawl).
 
 seeds:
   # --- frameworks & standards ------------------------------------------------
-  - url: https://ghgprotocol.org/corporate-standard
+  - url: https://ghgprotocol.org/standards
     source_type: framework
     org: GHG Protocol
     cadence: monthly
+    crawl: { max_depth: 2, max_pages: 30 }
   - url: https://www.globalreporting.org/standards/
     source_type: framework
     org: GRI
     cadence: monthly
+    crawl: { max_depth: 2, max_pages: 30 }
   - url: https://www.fsb-tcfd.org/recommendations/
     source_type: framework
     org: TCFD
     cadence: monthly
+    crawl: { max_depth: 1, max_pages: 15 }
+  - url: https://tnfd.global/recommendations-of-the-tnfd/
+    source_type: framework
+    org: TNFD
+    cadence: monthly
+    crawl: { max_depth: 2, max_pages: 25 }
+  - url: https://sasb.ifrs.org/standards/
+    source_type: framework
+    org: SASB / IFRS
+    cadence: monthly
+    crawl: { max_depth: 2, max_pages: 25 }
+  - url: https://integratedreporting.ifrs.org/the-integrated-reporting-framework/
+    source_type: framework
+    org: Integrated Reporting
+    cadence: monthly
+    crawl: { max_depth: 1, max_pages: 15 }
 
   # --- regulators & standard-setters ----------------------------------------
-  - url: https://www.ifrs.org/issued-standards/ifrs-sustainability-standards-navigator/ifrs-s2-climate-related-disclosures/
+  - url: https://www.ifrs.org/issued-standards/ifrs-sustainability-standards-navigator/
     source_type: regulator
     org: IFRS / ISSB
     cadence: monthly
+    crawl: { max_depth: 2, max_pages: 30 }
   - url: https://finance.ec.europa.eu/capital-markets-union-and-financial-markets/company-reporting-and-auditing/company-reporting/corporate-sustainability-reporting_en
     source_type: regulator
     org: European Commission (CSRD)
     cadence: monthly
+    crawl: { max_depth: 2, max_pages: 25 }
+  - url: https://www.efrag.org/en/sustainability-reporting
+    source_type: regulator
+    org: EFRAG (ESRS)
+    cadence: monthly
+    crawl: { max_depth: 2, max_pages: 25 }
+  - url: https://www.sec.gov/securities-topics/climate-esg
+    source_type: regulator
+    org: US SEC
+    cadence: weekly
+    crawl: { max_depth: 1, max_pages: 15 }
 
   # --- ratings ---------------------------------------------------------------
   - url: https://www.msci.com/our-solutions/esg-investing/esg-ratings
     source_type: ratings
     org: MSCI
     cadence: weekly
+    crawl: { max_depth: 1, max_pages: 15 }
+  - url: https://www.sustainalytics.com/esg-data
+    source_type: ratings
+    org: Sustainalytics
+    cadence: weekly
+    crawl: { max_depth: 1, max_pages: 15 }
+  - url: https://www.spglobal.com/esg/
+    source_type: ratings
+    org: S&P Global ESG
+    cadence: weekly
+    crawl: { max_depth: 1, max_pages: 20 }
 
   # --- NGOs & target-setting -------------------------------------------------
   - url: https://sciencebasedtargets.org/how-it-works
     source_type: ngo
     org: SBTi
     cadence: weekly
-  - url: https://www.cdp.net/en/companies/companies-scores
+    crawl: { max_depth: 2, max_pages: 30 }
+  - url: https://www.cdp.net/en/guidance
     source_type: ngo
     org: CDP
     cadence: weekly
+    crawl: { max_depth: 2, max_pages: 20 }
+  - url: https://www.unpri.org/sustainability-issues
+    source_type: ngo
+    org: UN PRI
+    cadence: monthly
+    crawl: { max_depth: 2, max_pages: 25 }
+  - url: https://unglobalcompact.org/what-is-gc/our-work/sustainable-development
+    source_type: ngo
+    org: UN Global Compact
+    cadence: monthly
+    crawl: { max_depth: 2, max_pages: 25 }
+  - url: https://www.ceres.org/climate
+    source_type: ngo
+    org: Ceres
+    cadence: weekly
+    crawl: { max_depth: 1, max_pages: 20 }
+  - url: https://www.wri.org/initiatives
+    source_type: ngo
+    org: World Resources Institute
+    cadence: weekly
+    crawl: { max_depth: 1, max_pages: 20 }
+  - url: https://www.wbcsd.org/pathways/
+    source_type: ngo
+    org: WBCSD
+    cadence: monthly
+    crawl: { max_depth: 1, max_pages: 20 }
+
+  # --- domain news -----------------------------------------------------------
+  - url: https://www.esgtoday.com/category/esg-news/
+    source_type: news
+    org: ESG Today
+    cadence: daily
+    crawl: { max_depth: 1, max_pages: 20 }

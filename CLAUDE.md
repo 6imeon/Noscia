@@ -43,7 +43,7 @@ A company-internal, vertical **ESG neural-search** web app: Exa-style retrieval 
 | Vite / React / TS | 8.0.16 / 19.2.6 / 6.0.2 | dev port pinned to **5180** (strictPort) |
 | Tailwind | 4.3.0 | v4 `@tailwindcss/vite`; tokens in `@theme` (index.css) |
 | vitest | 4.1.8 | + @testing-library/react, jsdom |
-| crawl4ai | 0.8.9 | Phase 1 crawler; `crawl4ai-setup` (Playwright Chromium) once |
+| crawl4ai | 0.8.9 | crawler; `crawl4ai-setup` (Playwright Chromium) once. Phase 2.5: `deep_crawling.BFSDeepCrawlStrategy` for bounded same-domain deep crawl |
 | sentence-transformers | 5.5.1 | loads embedder + cross-encoder reranker |
 | torch | 2.12.0 | pulled by sentence-transformers |
 | transformers | 5.10.2 | tokenizer/model backend |

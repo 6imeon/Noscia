@@ -6,7 +6,8 @@
 -- chunks: the search corpus. One row per ~512-token passage.
 CREATE TABLE IF NOT EXISTS chunks (
     id            TEXT PRIMARY KEY,                 -- position-stable: sha256(url#ordinal), so a recrawl diffs content_hash in place
-    url           TEXT        NOT NULL,
+    url           TEXT        NOT NULL,             -- the page this chunk came from (citation target)
+    source_url    TEXT,                             -- the seed this page was discovered under (deep crawl); enables source-level page pruning
     title         TEXT        NOT NULL DEFAULT '',
     org           TEXT,
     source_type   TEXT        NOT NULL,             -- contract SourceType literal
@@ -16,6 +17,10 @@ CREATE TABLE IF NOT EXISTS chunks (
     dense         vector(256) NOT NULL,             -- Qwen3 → Matryoshka 256, L2-normalized
     crawled_at    TIMESTAMPTZ NOT NULL DEFAULT now()
 );
+
+-- Deep crawl (Phase 2.5): a seed expands to many same-domain pages; source_url ties
+-- each chunk back to its seed so a vanished page's chunks can be pruned source-wide.
+ALTER TABLE chunks ADD COLUMN IF NOT EXISTS source_url TEXT;
 
 -- Dense ANN: HNSW over cosine distance (pgvector). `<=>` is cosine distance.
 CREATE INDEX IF NOT EXISTS chunks_dense_hnsw
@@ -27,6 +32,7 @@ CREATE INDEX IF NOT EXISTS chunks_bm25
     WITH (key_field = 'id');
 
 CREATE INDEX IF NOT EXISTS chunks_url_idx ON chunks (url);
+CREATE INDEX IF NOT EXISTS chunks_source_url_idx ON chunks (source_url);
 
 -- sources: one row per seed URL — powers the Corpus view (status, counts, cadence).
 CREATE TABLE IF NOT EXISTS sources (

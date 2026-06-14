@@ -12,13 +12,15 @@ A vertical, ESG-domain neural search app — Exa-style retrieval over a curated 
 ## Status
 
 Phase 2 (quality + freshness) in progress: an **eval gate** (nDCG@10 / MRR /
-Recall@10 on a held-out ESG set), **incremental crawl** (HTTP 304 + content-hash diff,
-adaptive cadence), and a LoRA **fine-tune pipeline** that runs locally and is honestly
-eval-gated (no ship on the demo corpus — the eval is saturated). Search is **index-only**:
-no third-party search providers, no external data egress (freshness comes from incremental
-recrawl, not a live API). Phase 1 (core ESG search) — crawl → index → hybrid → rerank →
-highlighted, cited results — is complete. See [CHANGELOG.md](CHANGELOG.md) and
-[IMPLEMENTATION.md](IMPLEMENTATION.md) §7.
+Recall@10 on a held-out ESG set, scored at source-domain level), **deep crawl** (each
+authoritative domain is crawled in depth — bounded same-domain BFS — for a **578-page /
+2,593-chunk** index across 21 sources, clean prose with cookie/consent boilerplate stripped),
+**incremental crawl** (HTTP 304 + content-hash diff + page-level prune, adaptive
+cadence), and a LoRA **fine-tune pipeline** that runs locally and is honestly eval-gated.
+Search is **index-only**: no third-party search providers, no external data egress —
+depth comes from crawling our 21 curated authoritative domains, never the open web (rule 13).
+Phase 1 (core ESG search) — crawl → index → hybrid → rerank → highlighted, cited results —
+is complete. See [CHANGELOG.md](CHANGELOG.md) and [IMPLEMENTATION.md](IMPLEMENTATION.md) §7.
 
 ### Run the dev loop
 

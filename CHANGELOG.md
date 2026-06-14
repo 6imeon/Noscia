@@ -4,6 +4,49 @@ All notable changes to Noscia are recorded here. Updated at the **end of each ph
 (see [IMPLEMENTATION.md](IMPLEMENTATION.md) §7). Format loosely follows
 [Keep a Changelog](https://keepachangelog.com/); dates are absolute.
 
+## Phase 2.5 — Corpus depth (deep crawl) — 2026-06-14
+
+The index went from **8 single landing pages** to a professional-scale corpus by
+crawling each authoritative domain in *depth* — never the open web (rule 13). A seed is
+now a **site section**, not one page.
+
+### Deep crawl (`server/src/noscia/ingest/`)
+- `crawl.py::crawl_site` — bounded **same-domain BFS** (crawl4ai `BFSDeepCrawlStrategy`):
+  `max_depth` / `max_pages` per seed, `include_external=False`, non-HTML dropped by
+  content type, and a junk-path exclude list (login/search/taxonomy/legal/nav). crawl4ai's
+  memory-adaptive dispatcher throttles concurrency so it stays inside the 18 GB box.
+- `run.py` restructured to **per-seed** ingestion: each seed deep-crawls → every page is
+  hash-diffed independently → a **source-level page prune** drops chunks whose page vanished
+  from the site. Single-page seeds (`max_depth: 0`) keep the cheap 304 short-circuit; deep
+  seeds always crawl (a landing-page 304 says nothing about sub-pages) and lean on the diff.
+- `chunks.source_url` (idempotent `ALTER`) ties every chunk back to the seed it was found
+  under — the key that makes source-level page pruning and accurate per-source page counts work.
+- `seeds.esg.yaml` — expanded from 8 → **21 authoritative ESG domains** (frameworks,
+  regulators, ratings, NGOs, news), each with a `crawl:` block (depth/page caps/excludes)
+  tuned to a ~300–500-page index. Still curated and narrow (rule 11): depth, not breadth-to-the-web.
+
+### Content quality — clean prose, not page chrome (`crawl.py`, `chunk.py`)
+- Default crawl4ai output is *raw* markdown — on these sites dominated by cookie banners,
+  cookie-declaration tables, language/nav menus. Fixed in three layers: a `PruningContentFilter`
+  (density heuristic → populates `fit_markdown`), `excluded_tags` (nav/header/footer/aside/form),
+  and `excluded_selector` dropping the consent widgets (Cookiebot/OneTrust) **at the source** —
+  plus a chunk-level line filter for stray banner sentences that keeps real ESG terms (FPIC —
+  Free, Prior and Informed *Consent*). Verified **0 cookie-polluted chunks** across the corpus.
+- Tested and rejected `remove_overlay_elements` / JS "Accept all" click: the former deletes
+  ghgprotocol.org's main content (misreads it as an overlay); the latter dismisses the *popup*
+  but leaves Cookiebot's inline *declaration table* in the DOM (GRI: 40 cookie mentions remain).
+  Removing the widget by selector is strictly cleaner.
+
+### Eval re-grounded to source-domain level (`train/eval.py`)
+- Relevance is now judged at the **source domain**, not the exact URL: a query names the
+  authoritative org that answers it, and any page of that domain counts (deduped to its best
+  rank per domain). Deep-crawl sub-pages and recrawl URL churn no longer perturb rule 9's gate.
+  The existing `esg_queries.jsonl` labels stayed valid by construction (domains unchanged).
+- **Corpus after rebuild: 578 pages / 2,593 chunks across 21 sources** (8 → 21 domains;
+  17 MB index). Eval **Quality** nDCG@10 0.943 · MRR 0.967 · Recall@10 0.944; **Fast** 0.917 ·
+  0.922 · 0.978. The gate **de-saturated** (was ≈0.99/1.000 on the 8-doc corpus) — there's now
+  measurable headroom, so a fine-tune *could* show a win and rule 9 can discriminate again.
+
 ## Phase 2 — Quality + freshness — 2026-06-14
 
 Two halves landed: an **eval gate** for every model change, and **incremental
