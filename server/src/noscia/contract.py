@@ -60,6 +60,52 @@ class SearchResponse(BaseModel):
     trace: PipelineTrace
 
 
+# --- /corpus (index stats + sources; Corpus view §8.4) -------------------
+class CorpusStats(BaseModel):
+    chunks: int  # total indexed passages
+    sources: int  # registered seed URLs
+    pages: int  # crawled pages
+    index_bytes: int  # pg_total_relation_size('chunks')
+    embed_model: str
+    embed_dims: int
+
+
+class CorpusSource(BaseModel):
+    url: str
+    source_type: SourceType
+    org: str | None = None
+    cadence: str
+    status: Literal["idle", "crawling", "done", "error"]
+    pages: int
+    chunks: int
+    last_crawl: str | None = None  # ISO-8601
+    error: str | None = None
+
+
+class CorpusResponse(BaseModel):
+    stats: CorpusStats
+    sources: list[CorpusSource]
+
+
+class AddSeedRequest(BaseModel):
+    url: str = Field(min_length=1)
+    source_type: SourceType
+    org: str | None = None
+    cadence: str = "monthly"
+
+
+class IngestRequest(BaseModel):
+    # Omit `urls` to (re)ingest every registered seed.
+    urls: list[str] | None = None
+
+
+class IngestResponse(BaseModel):
+    ok: bool
+    indexed_pages: int
+    chunks: int
+    errors: list[str] = Field(default_factory=list)
+
+
 # --- /providers (BYOK key status; never the raw key) ---------------------
 class ProviderKeyStatus(BaseModel):
     provider: str  # "openrouter" | "anthropic" | "openai" | "ollama"

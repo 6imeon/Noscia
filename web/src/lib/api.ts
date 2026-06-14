@@ -58,6 +58,53 @@ export interface ProvidersResponse {
   default_tier: Tier
 }
 
+// --- /corpus (index stats + sources; Corpus view §8.4) ---
+export interface CorpusStats {
+  chunks: number
+  sources: number
+  pages: number
+  index_bytes: number
+  embed_model: string
+  embed_dims: number
+}
+
+export type SourceStatus = 'idle' | 'crawling' | 'done' | 'error'
+
+export interface CorpusSource {
+  url: string
+  source_type: SourceType
+  org: string | null
+  cadence: string
+  status: SourceStatus
+  pages: number
+  chunks: number
+  last_crawl: string | null
+  error: string | null
+}
+
+export interface CorpusResponse {
+  stats: CorpusStats
+  sources: CorpusSource[]
+}
+
+export interface AddSeedRequest {
+  url: string
+  source_type: SourceType
+  org?: string | null
+  cadence?: string
+}
+
+export interface IngestRequest {
+  urls?: string[] | null
+}
+
+export interface IngestResponse {
+  ok: boolean
+  indexed_pages: number
+  chunks: number
+  errors: string[]
+}
+
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
   const res = await fetch(`${BASE}${path}`, {
     headers: { 'content-type': 'application/json' },
@@ -72,4 +119,9 @@ export const api = {
   providers: () => request<ProvidersResponse>('/providers'),
   search: (body: SearchRequest) =>
     request<SearchResponse>('/search', { method: 'POST', body: JSON.stringify(body) }),
+  corpus: () => request<CorpusResponse>('/corpus'),
+  ingest: (body: IngestRequest = {}) =>
+    request<IngestResponse>('/corpus/ingest', { method: 'POST', body: JSON.stringify(body) }),
+  addSeed: (body: AddSeedRequest) =>
+    request<IngestResponse>('/corpus/add', { method: 'POST', body: JSON.stringify(body) }),
 }

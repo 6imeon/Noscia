@@ -4,6 +4,64 @@ All notable changes to Noscia are recorded here. Updated at the **end of each ph
 (see [IMPLEMENTATION.md](IMPLEMENTATION.md) §7). Format loosely follows
 [Keep a Changelog](https://keepachangelog.com/); dates are absolute.
 
+## Phase 1 — Core ESG search — 2026-06-14
+
+The crawl → index → search pipeline is live end to end. An ESG question returns
+relevant, highlighted, cited passages from the local index — verified through the
+Vite proxy the browser uses. Built thin (8 curated seeds, 37 chunks) per the
+"thin end-to-end first" rule.
+
+### Ingestion (`server/src/noscia/ingest/`)
+- `corpus/seeds.esg.yaml` — 8 curated ESG seeds (GHG Protocol, GRI, TCFD, IFRS S2,
+  EU CSRD, MSCI, SBTi, CDP) grouped by `source_type` + recrawl cadence.
+- `crawl.py` — crawl4ai 0.8.9 (headless Chromium) → clean markdown + title; per-URL
+  error capture so one dead seed never sinks a run.
+- `chunk.py` — tiktoken-accurate ~512-token windows (64 overlap) with a `content_hash`
+  per chunk (for Phase 2 incremental crawl); strips markdown link/image/nav soup so
+  passages read clean.
+- `run.py` — the ingest runner + `python -m noscia.ingest.run` CLI; delete-by-url then
+  upsert so a re-crawl never leaves stale chunks. Source status walks idle → crawling → done/error.
+
+### Search (`server/src/noscia/search/`)
+- `embed.py` — Qwen3-Embedding-0.6B via sentence-transformers; query-instruction vs raw-doc
+  asymmetry; **Matryoshka** truncation 1024→256 + renormalize. Lazy-loaded, MPS/CUDA/CPU auto.
+- `store.py` — `PgVectorStore` (the one `VectorStore` impl): `ON CONFLICT` upsert and the
+  **hybrid RRF query in one Postgres round-trip** — dense CTE (pgvector `<=>`) + BM25 CTE
+  (`pg_search` `@@@`), fused with Reciprocal Rank Fusion in SQL.
+- `rerank.py` — `bge-reranker-v2-m3` cross-encoder over the fused top-50 (sigmoid-squashed scores).
+- `highlight.py` — best-matching passage per result with `<mark>` spans; crawled HTML escaped
+  before marking (no passage can inject markup).
+- `pipeline.py` — the two tiers: **Quality** (embed → hybrid → rerank → highlight) and **Fast**
+  (embed → dense-only ANN → highlight); returns the contract `SearchResponse` with the pipeline trace.
+
+### Datastore
+- `db/init/02-schema.sql` — `chunks` (`vector(256)` HNSW + `pg_search` bm25 index, content-addressed id)
+  and `sources` (Corpus view state). Idempotent; applied at initdb and re-applied on startup via `db.init_schema()`.
+
+### API + contract
+- `/search` now runs the real pipeline. New `/corpus`, `/corpus/ingest`, `/corpus/add` endpoints.
+- `contract.py` ⇄ `web/src/lib/api.ts` extended in lockstep: `CorpusStats`, `CorpusSource`,
+  `CorpusResponse`, `AddSeedRequest`, `IngestRequest/Response`.
+- App startup (lifespan) ensures schema + registers seeds idempotently.
+
+### Frontend (`web/`)
+- **Search view** fully wired: result list (`ResultRow` — #rank, source badge, `ScoreBar`,
+  org·host, `<mark>` snippet, ● fresh) + split-pane `PassageReader` (source pill, meta strip,
+  Highlighted↔Full-context toggle, Cite/Open actions). Empty/loading/error/done states.
+- **Corpus view**: stat cards (chunks, pages, index size, model/dims) + sources table
+  (status dot, counts, cadence, per-row recrawl) + add-&-crawl seed input.
+- `SourceType` badge/dot maps the `source_type` string to the §8.2 color tokens (single source of truth).
+
+### Pinned versions
+- crawl4ai 0.8.9 · sentence-transformers 5.5.1 · torch 2.12.0 · transformers 5.10.2 ·
+  numpy 2.4.6 · tiktoken 0.13.0 · pyyaml 6.0.3. Cooldown now **persisted** in
+  `pyproject.toml` (`[tool.uv] exclude-newer`) so every `uv` resolve honors the 7-day window.
+
+### Deferred to Phase 2 (noted, not silently skipped)
+- Live streaming crawl progress (Phase 1 ingest is synchronous with status transitions).
+- Full-page context in the reader's "Full-context" mode (currently drops `<mark>` spans only).
+- Embedder/reranker eval harness (nDCG@10 / MRR on `corpus/eval/esg_queries.jsonl`).
+
 ## Phase 0 — Skeleton + guardrails — 2026-06-14
 
 First buildable skeleton. The crawl → index → search pipeline and the UI surfaces

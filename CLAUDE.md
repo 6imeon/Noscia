@@ -15,7 +15,7 @@ A company-internal, vertical **ESG neural-search** web app: Exa-style retrieval 
 3. **No AI attribution in git.** Plain commit messages and PR bodies — no `Co-Authored-By: Claude`, no "Generated with Claude Code" footer.
 4. **Commit identity.** Author as `6imeon <260094322+6imeon@users.noreply.github.com>`. Never the real email.
 5. **HTTP contract first.** Define `noscia/contract.py` ⇄ `web/src/lib/api.ts` before implementing either side. Types must match exactly.
-6. **Secrets never touch the browser, never sit in source.** Read keys from `.env` (gitignored) via `get_secret()` in `noscia/config.py` — never `os.environ` directly, never name the module `secrets.py` (shadows stdlib). Backend returns only a **masked** confirmation. Ship `.env.example`.
+6. **Secrets never touch the browser, never sit in source.** Read keys from `.env` (gitignored) via `get_secret()` in `noscia/config.py` — never `os.environ` directly, never name the module `secrets.py` (shadows stdlib). Backend returns only a **masked** confirmation. Ship `.env.example`. **Never read/`cat`/print `.env` or any secret value** — confirm a key is set via the masked path (`/providers`), not by opening the file. `.env.example` (no real values) is fine.
 7. **Search runs without a key.** Local embeddings + local index = offline search. Only reasoning (entity search, synth data) needs BYOK.
 8. **Evidence-or-null extraction.** The entity agent never emits a field it can't cite. Blank beats hallucinated.
 9. **Eval-gated model changes.** Any embedding/reranker swap is gated on nDCG@10 / MRR against `corpus/eval/esg_queries.jsonl`. Decide on the ESG corpus, not leaderboards.
@@ -42,8 +42,16 @@ A company-internal, vertical **ESG neural-search** web app: Exa-style retrieval 
 | Vite / React / TS | 8.0.16 / 19.2.6 / 6.0.2 | dev port pinned to **5180** (strictPort) |
 | Tailwind | 4.3.0 | v4 `@tailwindcss/vite`; tokens in `@theme` (index.css) |
 | vitest | 4.1.8 | + @testing-library/react, jsdom |
-| crawl4ai | _tbd_ (v0.8.x) | Phase 1; >7d-old release |
-| Qwen3-Embedding-0.6B | — | model; eval before swapping |
+| crawl4ai | 0.8.9 | Phase 1 crawler; `crawl4ai-setup` (Playwright Chromium) once |
+| sentence-transformers | 5.5.1 | loads embedder + cross-encoder reranker |
+| torch | 2.12.0 | pulled by sentence-transformers |
+| transformers | 5.10.2 | tokenizer/model backend |
+| numpy | 2.4.6 | vector math (Matryoshka truncate/renormalize) |
+| tiktoken | 0.13.0 | token-accurate chunking (transitive via crawl4ai) |
+| pyyaml | 6.0.3 | parses `corpus/seeds.esg.yaml` |
+| Qwen3-Embedding-0.6B | — | model; 1024-dim → Matryoshka 256; eval before swapping |
 | bge-reranker-v2-m3 | — | model; eval vs Qwen3-Reranker-0.6B |
+
+Cooldown is persisted in `server/pyproject.toml` → `[tool.uv] exclude-newer = "2026-06-07T00:00:00Z"` so every `uv lock`/`sync`/`run` honors the 7-day window (not just a one-shot `--exclude-newer`). Renovate advances it behind review.
 
 Record exact versions here as each lands (IMPLEMENTATION §2 rule 8).

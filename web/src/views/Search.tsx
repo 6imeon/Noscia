@@ -1,8 +1,10 @@
-// Search view (Phase 1 primary) — Phase 0 ships the shell: shared search bar +
-// tier toggle wired to /search (returns empty for now), split pane with
-// empty/loading/error states (SPEC §8.4).
+// Search view (Phase 1 primary, SPEC §8.4): shared search bar + Quality/Fast
+// toggle → result list (badge/score/snippet) + passage reader. Selecting a row
+// opens its cited passage in the reader. Empty/loading/error/done states.
 import { useState } from 'react'
-import { api, type SearchResponse, type Tier } from '../lib/api'
+import { api, type SearchResponse, type SearchResult, type Tier } from '../lib/api'
+import { PassageReader } from '../components/PassageReader'
+import { ResultRow } from '../components/ResultRow'
 import { SearchBar } from '../components/SearchBar'
 
 type Status =
@@ -15,13 +17,16 @@ export function Search() {
   const [query, setQuery] = useState('')
   const [tier, setTier] = useState<Tier>('quality')
   const [status, setStatus] = useState<Status>({ kind: 'idle' })
+  const [selected, setSelected] = useState<SearchResult | null>(null)
 
   const run = async () => {
     if (!query.trim()) return
     setStatus({ kind: 'loading' })
+    setSelected(null)
     try {
       const data = await api.search({ query, tier })
       setStatus({ kind: 'done', data })
+      setSelected(data.results[0] ?? null)
     } catch (e) {
       setStatus({ kind: 'error', message: e instanceof Error ? e.message : 'search failed' })
     }
@@ -41,27 +46,33 @@ export function Search() {
       </div>
 
       <div className="grid min-h-0 flex-1 grid-cols-[minmax(0,1fr)_minmax(0,1.4fr)]">
-        {/* result list */}
         <section className="min-h-0 overflow-auto border-r border-line">
-          <ResultList status={status} />
+          <ResultList status={status} selected={selected} onSelect={setSelected} />
         </section>
-        {/* reader */}
-        <section className="min-h-0 overflow-auto p-6 text-sm text-dim">
-          select a result →
+        <section className="min-h-0 overflow-auto">
+          <PassageReader result={selected} />
         </section>
       </div>
     </div>
   )
 }
 
-function ResultList({ status }: { status: Status }) {
+function ResultList({
+  status,
+  selected,
+  onSelect,
+}: {
+  status: Status
+  selected: SearchResult | null
+  onSelect: (r: SearchResult) => void
+}) {
   if (status.kind === 'idle')
     return <Placeholder>Ask an ESG question to search the corpus.</Placeholder>
   if (status.kind === 'loading')
     return (
       <div className="space-y-2 p-4">
-        {[0, 1, 2].map((i) => (
-          <div key={i} className="h-16 animate-pulse rounded-md bg-panel-2" />
+        {[0, 1, 2, 3].map((i) => (
+          <div key={i} className="h-20 animate-pulse rounded-md bg-panel-2" />
         ))}
       </div>
     )
@@ -71,7 +82,7 @@ function ResultList({ status }: { status: Status }) {
   const { results, tier, trace } = status.data
   return (
     <div>
-      <header className="flex items-center justify-between border-b border-line px-4 py-2 font-mono text-[11px] text-muted">
+      <header className="sticky top-0 flex items-center justify-between border-b border-line bg-bg px-4 py-2 font-mono text-[11px] text-muted">
         <span>
           {results.length} passages · {tier} tier
         </span>
@@ -80,10 +91,17 @@ function ResultList({ status }: { status: Status }) {
         </span>
       </header>
       {results.length === 0 ? (
-        <Placeholder>
-          No results yet — the index is empty until Phase 1 ingestion runs.
-        </Placeholder>
-      ) : null}
+        <Placeholder>No matching passages. Try different terms, or widen the corpus in Corpus.</Placeholder>
+      ) : (
+        results.map((r) => (
+          <ResultRow
+            key={`${r.rank}-${r.url}`}
+            result={r}
+            active={selected?.rank === r.rank && selected?.url === r.url}
+            onSelect={() => onSelect(r)}
+          />
+        ))
+      )}
     </div>
   )
 }
@@ -96,9 +114,7 @@ function Placeholder({
   tone?: 'muted' | 'error'
 }) {
   return (
-    <div
-      className={`p-6 text-sm ${tone === 'error' ? 'text-accent-2' : 'text-dim'}`}
-    >
+    <div className={`p-6 text-sm ${tone === 'error' ? 'text-accent-2' : 'text-dim'}`}>
       {children}
     </div>
   )

@@ -1,0 +1,51 @@
+# Noscia ESG corpus seeds (Phase 1).
+#
+# Curated, narrow, vertical — quality over coverage (CLAUDE.md rule 11). Each seed
+# is one page that crawls cleanly to substantial markdown. `source_type` MUST be one
+# of the contract's SourceType literals (framework | regulator | ratings | report |
+# ngo | news) — it drives the §8.2 color tokens in the UI. `cadence` is the intended
+# recrawl rhythm (Phase 2 acts on it; Phase 1 records it for the Corpus view).
+#
+# Keep this list small and authoritative. Add seeds via the Corpus view (Phase 1)
+# or by editing here, then `uv run python -m noscia.ingest.run`.
+
+seeds:
+  # --- frameworks & standards ------------------------------------------------
+  - url: https://ghgprotocol.org/corporate-standard
+    source_type: framework
+    org: GHG Protocol
+    cadence: monthly
+  - url: https://www.globalreporting.org/standards/
+    source_type: framework
+    org: GRI
+    cadence: monthly
+  - url: https://www.fsb-tcfd.org/recommendations/
+    source_type: framework
+    org: TCFD
+    cadence: monthly
+
+  # --- regulators & standard-setters ----------------------------------------
+  - url: https://www.ifrs.org/issued-standards/ifrs-sustainability-standards-navigator/ifrs-s2-climate-related-disclosures/
+    source_type: regulator
+    org: IFRS / ISSB
+    cadence: monthly
+  - url: https://finance.ec.europa.eu/capital-markets-union-and-financial-markets/company-reporting-and-auditing/company-reporting/corporate-sustainability-reporting_en
+    source_type: regulator
+    org: European Commission (CSRD)
+    cadence: monthly
+
+  # --- ratings ---------------------------------------------------------------
+  - url: https://www.msci.com/our-solutions/esg-investing/esg-ratings
+    source_type: ratings
+    org: MSCI
+    cadence: weekly
+
+  # --- NGOs & target-setting -------------------------------------------------
+  - url: https://sciencebasedtargets.org/how-it-works
+    source_type: ngo
+    org: SBTi
+    cadence: weekly
+  - url: https://www.cdp.net/en/companies/companies-scores
+    source_type: ngo
+    org: CDP
+    cadence: weekly

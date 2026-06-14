@@ -11,15 +11,21 @@ A vertical, ESG-domain neural search app — Exa-style retrieval over a curated 
 
 ## Status
 
-Phase 0 (skeleton + guardrails) complete. See [CHANGELOG.md](CHANGELOG.md) for what landed and [IMPLEMENTATION.md](IMPLEMENTATION.md) §7 for the working tracker.
+Phase 1 (core ESG search) complete — crawl → index → hybrid search → rerank →
+highlighted, cited results, end to end. See [CHANGELOG.md](CHANGELOG.md) for what
+landed and [IMPLEMENTATION.md](IMPLEMENTATION.md) §7 for the working tracker.
 
 ### Run the dev loop
 
 ```bash
 docker compose up -d postgres                       # datastore (pgvector + pg_search)
-cd server && uv sync && uv run uvicorn noscia.app:app --reload   # API on :8000
+cd server && uv sync && uv run crawl4ai-setup        # deps + Playwright Chromium (once)
+uv run python -m noscia.ingest.run                   # crawl seeds → embed → index
+uv run uvicorn noscia.app:app --reload               # API on :8000
 pnpm install && pnpm dev                             # web on :5180 (proxies /api → :8000)
 ```
+
+First search downloads the embedder (~600 MB) and reranker; models cache under `data/`.
 
 ## Stack (planned)
 

@@ -166,19 +166,19 @@ Build Phase 1 thin and end-to-end first (a handful of seed URLs, one query, visi
 - [x] **DoD:** `docker compose up` brings Postgres up; `pnpm dev` + `uvicorn` run; `/health` green in browser (incl. DB); an OpenRouter key from `.env` round-trips through `get_secret()` (masked in the UI)
 
 ### Phase 1 — Core ESG search
-- [ ] `corpus/seeds.esg.yaml` populated with concrete ESG seed URLs grouped by `source_type` + cadence
-- [ ] `ingest/crawl.py` — crawl4ai (v0.8.x, cooldown-pinned) → clean markdown + metadata; `crawl4ai-setup` run
-- [ ] `ingest/chunk.py` — ~512-token chunks, ~64 overlap; compute `content_hash`
-- [ ] `search/embed.py` — Qwen3-Embedding-0.6B, `search_query:`/doc prefixes, Matryoshka truncate→256→renormalize
-- [ ] `search/store.py` — `VectorStore` interface + `PgVectorStore` impl; `chunks` table per §4 (dense `vector(256)` HNSW + `pg_search` bm25 index); upsert via `INSERT … ON CONFLICT (id)`
-- [ ] `search/hybrid.py` — one Postgres query: dense CTE (pgvector `<=>`, top~100) + BM25 CTE (`pg_search`, top~100) → **RRF** fuse (in SQL or app)
-- [ ] `search/rerank.py` — cross-encoder on top~50 (bge-reranker-v2-m3 **or** Qwen3-Reranker-0.6B); keep eval winner
-- [ ] `search/highlight.py` — return best-matching passage(s) per result, not whole pages
-- [ ] Two latency tiers: *Fast* (dense-only ANN, <200ms target) and *Quality* (hybrid+RRF+rerank, UI default)
-- [ ] UI shell (§8.3): icon rail + view router + §8.2 design tokens wired into Tailwind
-- [ ] UI Search view (§8.4): query box + Quality/Fast toggle → result list (badge/score/snippet) + passage reader with Highlighted↔Full-context toggle; empty/loading/error states
-- [ ] UI Corpus view (§8.4): stat cards + sources table (live crawl progress) + add-seed input
-- [ ] **DoD:** an ESG question returns relevant, highlighted, cited results from the local index in quality tier
+- [x] `corpus/seeds.esg.yaml` populated with concrete ESG seed URLs grouped by `source_type` + cadence
+- [x] `ingest/crawl.py` — crawl4ai (v0.8.9, cooldown-pinned) → clean markdown + metadata; `crawl4ai-setup` run
+- [x] `ingest/chunk.py` — ~512-token chunks, ~64 overlap (tiktoken-accurate); compute `content_hash`; strips markdown link/image noise
+- [x] `search/embed.py` — Qwen3-Embedding-0.6B, query-instruction/doc asymmetry, Matryoshka truncate→256→renormalize
+- [x] `search/store.py` — `VectorStore` interface + `PgVectorStore` impl; `chunks` table per §4 (dense `vector(256)` HNSW + `pg_search` bm25 index); upsert via `INSERT … ON CONFLICT (id)`
+- [x] Hybrid query — one Postgres round-trip: dense CTE (pgvector `<=>`, top~100) + BM25 CTE (`pg_search`, top~100) → **RRF fuse in SQL**. Lives in `store.py` (`_HYBRID_SQL`); tier orchestration in `search/pipeline.py`
+- [x] `search/rerank.py` — cross-encoder on the fused top~50 (bge-reranker-v2-m3; Qwen3-Reranker-0.6B is the eval-gated alternative)
+- [x] `search/highlight.py` — best-matching passage per result with `<mark>` spans; HTML-escaped before marking
+- [x] Two latency tiers: *Fast* (dense-only ANN) and *Quality* (hybrid+RRF+rerank, UI default) — `search/pipeline.py`
+- [x] UI shell (§8.3): icon rail + view router + §8.2 design tokens wired into Tailwind (landed Phase 0)
+- [x] UI Search view (§8.4): query box + Quality/Fast toggle → result list (badge/score/snippet) + passage reader with Highlighted↔Full-context toggle; empty/loading/error states
+- [x] UI Corpus view (§8.4): stat cards + sources table (status/recrawl) + add-&-crawl seed input
+- [x] **DoD:** an ESG question returns relevant, highlighted, cited results from the local index in quality tier ✓ (verified end-to-end through the Vite proxy)
 
 ### Phase 2 — Quality + freshness
 - [ ] `corpus/eval/esg_queries.jsonl` held-out eval set authored

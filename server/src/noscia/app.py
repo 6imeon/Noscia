@@ -7,21 +7,30 @@ before the pipeline exists.
 
 from __future__ import annotations
 
+from collections.abc import AsyncIterator
+from contextlib import asynccontextmanager
 from importlib.metadata import version as pkg_version
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from . import db
+from . import corpus, db
 from .config import get_secret, mask
 from .contract import (
+    AddSeedRequest,
+    CorpusResponse,
+    CorpusSource,
+    CorpusStats,
     HealthResponse,
-    PipelineTrace,
+    IngestRequest,
+    IngestResponse,
     ProviderKeyStatus,
     ProvidersResponse,
     SearchRequest,
     SearchResponse,
 )
+from .ingest import run as ingest
+from .search.pipeline import run_search
 
 try:
     VERSION = pkg_version("noscia")
@@ -33,7 +42,19 @@ except Exception:  # not installed as a dist (e.g. some test runners)
 # in web/vite.config.ts to avoid the crowded 5173 default.
 DEV_ORIGINS = ["http://localhost:5180", "http://127.0.0.1:5180"]
 
-app = FastAPI(title="Noscia", version=VERSION)
+@asynccontextmanager
+async def lifespan(_app: FastAPI) -> AsyncIterator[None]:
+    # Idempotent: ensure the schema exists and seeds are registered for the
+    # Corpus view even before the first crawl. Never blocks on model loading.
+    try:
+        db.init_schema()
+        ingest.register_seeds()
+    except Exception:  # a missing DB shouldn't stop the API from booting
+        pass
+    yield
+
+
+app = FastAPI(title="Noscia", version=VERSION, lifespan=lifespan)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=DEV_ORIGINS,
@@ -50,13 +71,45 @@ def health() -> HealthResponse:
 
 @app.post("/search", response_model=SearchResponse)
 def search(req: SearchRequest) -> SearchResponse:
-    # Phase 1 fills this in (ingest → hybrid → rerank → highlight). Stub for now:
-    # contract-valid empty response so the UI can render empty/loading states.
-    return SearchResponse(
-        query=req.query,
-        tier=req.tier,
-        results=[],
-        trace=PipelineTrace(dense=0, bm25=0, fused=0, reranked=0),
+    # embed → (hybrid+rerank | dense) → highlight. See search/pipeline.py.
+    return run_search(req)
+
+
+@app.get("/corpus", response_model=CorpusResponse)
+def corpus_state() -> CorpusResponse:
+    return CorpusResponse(
+        stats=CorpusStats(**corpus.stats()),
+        sources=[CorpusSource(**s) for s in corpus.list_sources()],
+    )
+
+
+@app.post("/corpus/ingest", response_model=IngestResponse)
+async def corpus_ingest(req: IngestRequest) -> IngestResponse:
+    seeds = ingest.register_seeds()
+    if req.urls:
+        wanted = set(req.urls)
+        specs = [s for s in seeds if s["url"] in wanted]
+    else:
+        specs = seeds
+    summary = await ingest.ingest_specs(specs)
+    return IngestResponse(
+        ok=summary["ok"],
+        indexed_pages=summary["indexed_pages"],
+        chunks=summary["chunks"],
+        errors=[f"{e['url']}: {e['error']}" for e in summary["errors"]],
+    )
+
+
+@app.post("/corpus/add", response_model=IngestResponse)
+async def corpus_add(req: AddSeedRequest) -> IngestResponse:
+    corpus.upsert_source(req.url, req.source_type, req.org, req.cadence)
+    spec = {"url": req.url, "source_type": req.source_type, "org": req.org, "cadence": req.cadence}
+    summary = await ingest.ingest_specs([spec])
+    return IngestResponse(
+        ok=summary["ok"],
+        indexed_pages=summary["indexed_pages"],
+        chunks=summary["chunks"],
+        errors=[f"{e['url']}: {e['error']}" for e in summary["errors"]],
     )
 
 
