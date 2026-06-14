@@ -12,11 +12,17 @@
 #
 # `crawl:` (optional) bounds the per-seed deep crawl:
 #   max_depth : link-follow depth from the seed. 0 = just the seed page.
-#   max_pages : hard cap on pages for this seed (BFS stops here).
+#   max_pages : hard cap on HTML pages for this seed (BFS stops here).
 #   exclude   : extra glob patterns to skip, on top of the global junk list
 #               (login/search/taxonomy/legal — see ingest/run.py DEFAULT_EXCLUDE).
-# Omit `crawl:` to take the defaults (depth 1, 25 pages). Same-domain only, non-HTML
-# (PDFs etc.) dropped automatically. Total caps here target a ~300–500 page index.
+#   max_pdfs  : how many PDF documents linked from the crawled pages to extract +
+#               embed (0 = none; default 4). PDFs carry the authoritative substance
+#               HTML-only crawling misses (TCFD reports, EFRAG/GRI guidance).
+#   pdf_hosts : extra hostnames a PDF may live on, beyond the seed's own domain —
+#               for sites that publish documents on a CDN (e.g. assets.bbhub.io).
+#               Curated allow-list only; never open-web discovery (rule 11/13).
+# Omit `crawl:` to take the defaults (depth 1, 25 pages, 4 PDFs). Same-domain HTML
+# only; PDFs are the one curated exception. Total caps here target a ~300–500 page index.
 #
 # Add seeds via the Corpus view or by editing here, then
 # `uv run python -m noscia.ingest.run` (or `--due` for cadence-only recrawl).
@@ -37,7 +43,24 @@ seeds:
     source_type: framework
     org: TCFD
     cadence: monthly
-    crawl: { max_depth: 1, max_pages: 15 }
+    # TCFD's substance is in PDFs (final recommendations + annual status reports),
+    # published on the assets.bbhub.io CDN and linked from /publications/. Skip the
+    # many translated copies — embed the English originals only.
+    crawl:
+      max_depth: 1
+      max_pages: 15
+      max_pdfs: 8
+      pdf_hosts: [assets.bbhub.io]
+      exclude:
+        - "*translation*"
+        - "*chinese*"
+        - "*japanese*"
+        - "*korean*"
+        - "*spanish*"
+        - "*portuguese*"
+        - "*french*"
+        - "*german*"
+        - "*.ko_*"
   - url: https://tnfd.global/recommendations-of-the-tnfd/
     source_type: framework
     org: TNFD

@@ -14,6 +14,9 @@ through to a full crawl and the content-hash diff catches the no-op anyway.
 from __future__ import annotations
 
 from dataclasses import dataclass
+from urllib.parse import urlsplit
+
+from .url import canonical_url
 
 # A real UA — some hosts 403 the default httpx agent (and skip validators for it).
 _UA = (
@@ -117,7 +120,10 @@ def _build_run_config(page_timeout_ms: int, deep_strategy=None):
         markdown_generator=md_generator,
         excluded_tags=["nav", "header", "footer", "aside", "form"],
         excluded_selector=_CONSENT_SELECTOR,  # drop cookie/consent widgets at the source
-        exclude_external_links=True,
+        # NB: external links are kept in result.links (needed for allow-listed PDF-host
+        # discovery, e.g. TCFD's assets.bbhub.io CDN). Markdown stays link-free via the
+        # generator's ignore_links; deep-crawl scope is bounded by the BFS
+        # include_external=False, so keeping them here never widens traversal.
         exclude_social_media_links=True,
     )
     if deep_strategy is not None:
@@ -142,12 +148,57 @@ def _title_of(result, url: str) -> str:
     return (meta.get("title") or "").strip() or url
 
 
+def _registrable_domain(url: str) -> str:
+    """Host minus a leading ``www.`` — the same-site test for PDF discovery."""
+    host = (urlsplit(url).hostname or "").lower()
+    return host[4:] if host.startswith("www.") else host
+
+
+def _collect_pdf_urls(
+    results, seed_url: str, *, pdf_hosts: set[str], exclude_patterns: list[str] | None
+) -> list[str]:
+    """Same-site (or allow-listed) PDF links discovered across the crawled pages.
+
+    A deep crawl can't follow a PDF (it's not HTML), but the pages it *does* render
+    link to the authoritative documents. We harvest those links, keep ones on the
+    seed's own domain or an operator-approved host (``pdf_hosts`` — e.g. TCFD's
+    ``assets.bbhub.io`` CDN), drop anything matching the junk ``exclude_patterns``,
+    and dedupe on the canonical URL. Curated, not open-web (CLAUDE.md rule 11/13).
+    """
+    import fnmatch
+
+    seed_domain = _registrable_domain(seed_url)
+    allowed = {h.lower() for h in pdf_hosts}
+    out: list[str] = []
+    seen: set[str] = set()
+    for result in results or []:
+        links = getattr(result, "links", None) or {}
+        for entry in list(links.get("internal", [])) + list(links.get("external", [])):
+            href = (entry or {}).get("href") if isinstance(entry, dict) else None
+            if not href or not urlsplit(href).path.lower().endswith(".pdf"):
+                continue
+            host = (urlsplit(href).hostname or "").lower()
+            if _registrable_domain(href) != seed_domain and host not in allowed:
+                continue
+            low = href.lower()
+            if exclude_patterns and any(fnmatch.fnmatch(low, p.lower()) for p in exclude_patterns):
+                continue
+            canon = canonical_url(href)
+            if canon in seen:
+                continue
+            seen.add(canon)
+            out.append(canon)
+    return out
+
+
 async def crawl_site(
     seed_url: str,
     *,
     max_depth: int = 1,
     max_pages: int = 25,
     exclude_patterns: list[str] | None = None,
+    max_pdfs: int = 0,
+    pdf_hosts: list[str] | None = None,
     page_timeout_ms: int = 45_000,
 ) -> list[CrawledPage]:
     """Bounded **same-domain** deep crawl from one seed (breadth-first).
@@ -159,8 +210,13 @@ async def crawl_site(
     crawl out of search/login/query-string traps. crawl4ai's memory-adaptive
     dispatcher throttles concurrency under pressure, which matters on a 18 GB box.
 
-    One ``CrawledPage`` per rendered page (deduped by URL); per-page failures are
-    flagged, never raised, so a few dead links don't sink the site.
+    When ``max_pdfs`` > 0, up to that many **PDF documents** linked from the crawled
+    pages are also extracted (``ingest.pdf``) and returned as pages — the authoritative
+    substance HTML-only crawling misses. They're kept to the seed's own domain plus any
+    operator-approved ``pdf_hosts`` (e.g. a publications CDN), never the open web.
+
+    One ``CrawledPage`` per rendered page or PDF (deduped by canonical URL); per-page
+    failures are flagged, never raised, so a few dead links don't sink the site.
     """
     from crawl4ai import AsyncWebCrawler, BrowserConfig
     from crawl4ai.deep_crawling import BFSDeepCrawlStrategy
@@ -193,8 +249,8 @@ async def crawl_site(
     pages: list[CrawledPage] = []
     seen: set[str] = set()
     for result in results or []:
-        url = getattr(result, "url", seed_url)
-        if url in seen:  # BFS can re-surface a URL via multiple parents
+        url = canonical_url(getattr(result, "url", seed_url))
+        if url in seen:  # BFS can re-surface a URL via multiple parents / cosmetic variants
             continue
         seen.add(url)
         if not getattr(result, "success", False):
@@ -207,7 +263,29 @@ async def crawl_site(
             pages.append(CrawledPage(url, title, "", ok=False, error="empty markdown"))
             continue
         pages.append(CrawledPage(url, title, markdown))
+
+    if max_pdfs > 0:
+        pages += await _crawl_pdfs(
+            results, seed_url, max_pdfs=max_pdfs, pdf_hosts=pdf_hosts, exclude=exclude_patterns
+        )
     return pages
+
+
+async def _crawl_pdfs(
+    results,
+    seed_url: str,
+    *,
+    max_pdfs: int,
+    pdf_hosts: list[str] | None,
+    exclude: list[str] | None,
+) -> list[CrawledPage]:
+    """Extract up to ``max_pdfs`` discovered PDFs (sequentially — pypdf is CPU-bound)."""
+    from .pdf import extract_pdf
+
+    urls = _collect_pdf_urls(
+        results, seed_url, pdf_hosts=set(pdf_hosts or ()), exclude_patterns=exclude
+    )[:max_pdfs]
+    return [await extract_pdf(u) for u in urls]
 
 
 async def crawl_many(urls: list[str], page_timeout_ms: int = 45_000) -> list[CrawledPage]:
@@ -217,9 +295,10 @@ async def crawl_many(urls: list[str], page_timeout_ms: int = 45_000) -> list[Cra
     run_cfg = _build_run_config(page_timeout_ms)
     pages: list[CrawledPage] = []
     async with AsyncWebCrawler(config=BrowserConfig(headless=True, verbose=False)) as crawler:
-        for url in urls:
+        for raw_url in urls:
+            url = canonical_url(raw_url)
             try:
-                result = await crawler.arun(url=url, config=run_cfg)
+                result = await crawler.arun(url=raw_url, config=run_cfg)
                 if not getattr(result, "success", False):
                     err = getattr(result, "error_message", "crawl failed")
                     pages.append(CrawledPage(url, url, "", ok=False, error=err))

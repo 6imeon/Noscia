@@ -44,6 +44,10 @@ SEEDS_PATH = Path(__file__).resolve().parents[4] / "corpus" / "seeds.esg.yaml"
 # Deep-crawl defaults (per-seed `crawl:` block in the YAML overrides these).
 DEFAULT_MAX_DEPTH = 1  # 0 = single page (just the seed)
 DEFAULT_MAX_PAGES = 25
+# Same-site PDFs linked from a deep crawl are extracted too (authoritative substance
+# that HTML-only crawling misses). Default a few per seed; a seed's `crawl:` block can
+# raise it and allow-list an external document host (`pdf_hosts`, e.g. a publications CDN).
+DEFAULT_MAX_PDFS = 4
 
 # Junk paths every deep crawl skips (login/search/taxonomy/legal pages and feeds) —
 # they carry no ESG substance and invite crawler traps. Globs; reverse-matched.
@@ -140,25 +144,37 @@ def _index_page(page: CrawledPage, spec: dict, source_url: str) -> PageResult:
     )
 
 
-def _crawl_config(spec: dict) -> tuple[int, int, list[str]]:
-    """Read a seed's ``crawl:`` block → (max_depth, max_pages, exclude globs)."""
+@dataclass
+class CrawlConfig:
+    depth: int
+    max_pages: int
+    exclude: list[str]
+    max_pdfs: int
+    pdf_hosts: list[str]
+
+
+def _crawl_config(spec: dict) -> CrawlConfig:
+    """Read a seed's ``crawl:`` block → depth / page+pdf caps / exclude + pdf hosts."""
     crawl = spec.get("crawl") or {}
-    depth = int(crawl.get("max_depth", DEFAULT_MAX_DEPTH))
-    max_pages = int(crawl.get("max_pages", DEFAULT_MAX_PAGES))
-    exclude = DEFAULT_EXCLUDE + list(crawl.get("exclude") or [])
-    return depth, max_pages, exclude
+    return CrawlConfig(
+        depth=int(crawl.get("max_depth", DEFAULT_MAX_DEPTH)),
+        max_pages=int(crawl.get("max_pages", DEFAULT_MAX_PAGES)),
+        exclude=DEFAULT_EXCLUDE + list(crawl.get("exclude") or []),
+        max_pdfs=int(crawl.get("max_pdfs", DEFAULT_MAX_PDFS)),
+        pdf_hosts=list(crawl.get("pdf_hosts") or []),
+    )
 
 
 async def _ingest_seed(spec: dict, *, conditional: bool) -> dict:
     """Crawl + incrementally index one seed (single page or bounded deep crawl)."""
     seed = spec["url"]
-    depth, max_pages, exclude = _crawl_config(spec)
+    cfg = _crawl_config(spec)
     corpus.set_status(seed, "crawling")
 
     # Single-page seeds keep the cheap 304 short-circuit. Deep seeds always crawl —
     # a landing-page 304 says nothing about its sub-pages — and lean on the hash diff.
     fresh_validator: tuple[str | None, str | None] | None = None
-    if depth <= 0:
+    if cfg.depth <= 0:
         if conditional:
             cond = await check_conditional(seed, *corpus.get_validators(seed))
             if cond.not_modified:
@@ -169,7 +185,12 @@ async def _ingest_seed(spec: dict, *, conditional: bool) -> dict:
         pages = await crawl_many([seed])
     else:
         pages = await crawl_site(
-            seed, max_depth=depth, max_pages=max_pages, exclude_patterns=exclude
+            seed,
+            max_depth=cfg.depth,
+            max_pages=cfg.max_pages,
+            exclude_patterns=cfg.exclude,
+            max_pdfs=cfg.max_pdfs,
+            pdf_hosts=cfg.pdf_hosts,
         )
 
     ok_pages = [p for p in pages if p.ok]

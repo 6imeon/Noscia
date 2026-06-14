@@ -42,10 +42,36 @@ now a **site section**, not one page.
   authoritative org that answers it, and any page of that domain counts (deduped to its best
   rank per domain). Deep-crawl sub-pages and recrawl URL churn no longer perturb rule 9's gate.
   The existing `esg_queries.jsonl` labels stayed valid by construction (domains unchanged).
-- **Corpus after rebuild: 578 pages / 2,593 chunks across 21 sources** (8 → 21 domains;
-  17 MB index). Eval **Quality** nDCG@10 0.943 · MRR 0.967 · Recall@10 0.944; **Fast** 0.917 ·
-  0.922 · 0.978. The gate **de-saturated** (was ≈0.99/1.000 on the 8-doc corpus) — there's now
-  measurable headroom, so a fine-tune *could* show a win and rule 9 can discriminate again.
+- **Corpus at end of phase 2.5: 581 pages / 4,925 chunks across 21 sources** (8 → 21 domains;
+  34 MB index) — includes the PDF documents and URL-deduplication below. Eval **Quality**
+  nDCG@10 0.914 · MRR 0.933 · Recall@10 0.911; **Fast** 0.881 · 0.900 · 0.911. The gate
+  **de-saturated** (was ≈0.99/1.000 on the 8-doc corpus) — there's now measurable headroom,
+  so a fine-tune *could* show a win and rule 9 can discriminate again.
+
+### PDF extraction — the substance HTML crawling misses (`ingest/pdf.py`, `pypdf` 6.13.0)
+- Some authoritative domains publish their real content as **PDFs**, not HTML — TCFD's
+  recommendations + annual status reports are the clearest case (the site was 1 thin page).
+  `crawl_site` now harvests PDF links found across the crawled pages and `extract_pdf` fetches
+  each (`httpx`, size-capped, fail-soft) and pulls its text with `pypdf` — flowing through the
+  **same** chunk → embed → upsert path as HTML, citing its own URL.
+- Kept **curated**, not open-web (rule 11/13): PDFs are taken from the seed's own domain plus
+  an explicit per-seed `pdf_hosts` allow-list (e.g. TCFD's `assets.bbhub.io` publications CDN).
+  A per-seed `max_pdfs` cap and translation excludes keep the budget on English originals.
+  Scanned/image-only PDFs (no text layer) and oversized files are skipped, never OCR'd.
+- One subtlety worth recording: the deep-crawl run config dropped *external* links before
+  discovery could see them, so an allow-listed external host (`assets.bbhub.io`) was invisible
+  even though same-domain PDFs worked. Fixed by keeping external links in `result.links`
+  (markdown stays link-free via the generator; BFS scope is still bounded by `include_external`).
+  Net: **45 PDF documents / 2,394 chunks** indexed — TCFD went from 1 thin landing page to its
+  full 2017 recommendations report.
+
+### URL canonicalization — no more `?page=1` duplicate results (`ingest/url.py`)
+- A deep crawl surfaced the same page under cosmetic variants (`?page=1` ≡ the bare URL,
+  trailing slash, `#fragment`, `utm_*` tracking) — each minting a distinct `chunk_id` and a
+  **duplicate search result**. `canonical_url` folds them at the single point a crawled page
+  gets its URL: lowercase host, drop fragment + tracking + first-page pagination, strip trailing
+  slash, sort surviving params. Conservative — `?page=2` and unknown params are preserved.
+  After re-ingest the corpus holds **0** `?page=1`/`?paged=1` duplicate result URLs (was 64).
 
 ## Phase 2 — Quality + freshness — 2026-06-14
 

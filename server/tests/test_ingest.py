@@ -1,7 +1,13 @@
 """Pure-function tests for the ingest/search building blocks (no models, no DB)."""
 
 from noscia.ingest.chunk import CHUNK_TOKENS, _strip_boilerplate, chunk_markdown, content_hash
-from noscia.ingest.run import DEFAULT_EXCLUDE, DEFAULT_MAX_DEPTH, DEFAULT_MAX_PAGES, _crawl_config
+from noscia.ingest.run import (
+    DEFAULT_EXCLUDE,
+    DEFAULT_MAX_DEPTH,
+    DEFAULT_MAX_PAGES,
+    DEFAULT_MAX_PDFS,
+    _crawl_config,
+)
 from noscia.search.highlight import highlight
 
 
@@ -27,23 +33,32 @@ def test_strip_boilerplate_keeps_fpic_consent():
 
 
 def test_crawl_config_defaults_when_block_absent():
-    depth, max_pages, exclude = _crawl_config({"url": "https://x"})
-    assert depth == DEFAULT_MAX_DEPTH
-    assert max_pages == DEFAULT_MAX_PAGES
-    assert exclude == DEFAULT_EXCLUDE  # global junk list, nothing extra
+    cfg = _crawl_config({"url": "https://x"})
+    assert cfg.depth == DEFAULT_MAX_DEPTH
+    assert cfg.max_pages == DEFAULT_MAX_PAGES
+    assert cfg.max_pdfs == DEFAULT_MAX_PDFS
+    assert cfg.exclude == DEFAULT_EXCLUDE  # global junk list, nothing extra
+    assert cfg.pdf_hosts == []  # no external document host unless allow-listed
 
 
 def test_crawl_config_reads_and_merges_overrides():
     spec = {"url": "https://x", "crawl": {"max_depth": 2, "max_pages": 40, "exclude": ["*/api/*"]}}
-    depth, max_pages, exclude = _crawl_config(spec)
-    assert (depth, max_pages) == (2, 40)
-    assert "*/api/*" in exclude  # per-seed extra appended …
-    assert set(DEFAULT_EXCLUDE) <= set(exclude)  # … on top of the global junk list
+    cfg = _crawl_config(spec)
+    assert (cfg.depth, cfg.max_pages) == (2, 40)
+    assert "*/api/*" in cfg.exclude  # per-seed extra appended …
+    assert set(DEFAULT_EXCLUDE) <= set(cfg.exclude)  # … on top of the global junk list
+
+
+def test_crawl_config_reads_pdf_overrides():
+    spec = {"url": "https://x", "crawl": {"max_pdfs": 8, "pdf_hosts": ["assets.bbhub.io"]}}
+    cfg = _crawl_config(spec)
+    assert cfg.max_pdfs == 8
+    assert cfg.pdf_hosts == ["assets.bbhub.io"]  # operator-approved external doc host
 
 
 def test_crawl_config_depth_zero_is_single_page():
-    depth, _, _ = _crawl_config({"url": "https://x", "crawl": {"max_depth": 0}})
-    assert depth == 0  # single-page seed keeps the 304 short-circuit path
+    cfg = _crawl_config({"url": "https://x", "crawl": {"max_depth": 0}})
+    assert cfg.depth == 0  # single-page seed keeps the 304 short-circuit path
 
 
 def test_chunking_sizes_and_hash_are_stable():
