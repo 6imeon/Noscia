@@ -1,0 +1,25 @@
+# Datastore for the local dev loop AND the company deployment (dev == prod, SPEC §9).
+# ParadeDB = Postgres 17 + pgvector + pg_search in one image.
+# Dev: `docker compose up postgres`. The web/api/embeddings/ingest/proxy services
+# for the company deployment are tracked in IMPLEMENTATION §9.2 — not built yet.
+
+services:
+  postgres:
+    image: paradedb/paradedb:0.24.0-pg17
+    environment:
+      POSTGRES_USER: noscia
+      POSTGRES_PASSWORD: noscia
+      POSTGRES_DB: noscia
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+      - ./db/init:/docker-entrypoint-initdb.d:ro # CREATE EXTENSION vector, pg_search (first init only)
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U noscia -d noscia"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+volumes:
+  pgdata:

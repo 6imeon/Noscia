@@ -1,0 +1,14 @@
+packages:
+  - web
+
+# Supply-chain cooldown (SPEC §11, IMPLEMENTATION §2 rule 1).
+# pnpm 11 enables minimumReleaseAge by default at 1440 (1 day); we raise it to 7 days.
+# A newly published version won't be installed until it is at least this old.
+minimumReleaseAge: 10080 # minutes = 7 days
+# Strict=false (the default): fall back to the newest version that IS old enough
+# rather than failing the install. Keep init painless.
+minimumReleaseAgeStrict: false
+# Whitelist for a single vetted hotfix that must bypass the cooldown. Keep empty.
+minimumReleaseAgeExclude: []
+# Refuse install scripts from packages outside the workspace's allow list.
+blockExoticSubdeps: true

@@ -1,0 +1,17 @@
+{
+  "name": "noscia",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Vertical ESG-domain neural search — company-internal Exa-style retrieval over a curated sustainability corpus.",
+  "packageManager": "pnpm@11.5.1",
+  "engines": {
+    "node": ">=22",
+    "pnpm": ">=11"
+  },
+  "scripts": {
+    "dev": "pnpm --filter web dev",
+    "build": "pnpm --filter web build",
+    "lint": "pnpm --filter web lint",
+    "test": "pnpm --filter web test"
+  }
+}

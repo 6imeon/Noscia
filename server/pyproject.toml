@@ -1,0 +1,42 @@
+[project]
+name = "noscia"
+version = "0.1.0"
+description = "Company-internal ESG neural-search backend (FastAPI)."
+readme = "README.md"
+authors = [
+    { name = "6imeon", email = "260094322+6imeon@users.noreply.github.com" }
+]
+requires-python = ">=3.12"
+dependencies = [
+    "fastapi",
+    "uvicorn[standard]",
+    "pydantic",
+    "pydantic-settings",
+    "python-dotenv",
+    "psycopg[binary]",
+    "pgvector",
+    "sqlalchemy",
+]
+
+[dependency-groups]
+dev = [
+    "ruff",
+    "pytest",
+    "httpx",
+]
+
+[build-system]
+requires = ["uv_build>=0.11.16,<0.12.0"]
+build-backend = "uv_build"
+
+[tool.ruff]
+line-length = 100
+src = ["src", "tests"]
+target-version = "py312"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B", "SIM"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["src"]

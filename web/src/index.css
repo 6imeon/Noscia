@@ -1,0 +1,68 @@
+@import 'tailwindcss';
+
+/* Design tokens — "Research Console" espresso shell (SPEC §8.2).
+   Defined as Tailwind v4 @theme so utilities generate: bg-panel, text-ink,
+   border-line, text-accent, font-mono, etc. Single source of truth — components
+   never hard-code hex. */
+@theme {
+  /* surfaces */
+  --color-bg: #201b16;
+  --color-panel: #29231c;
+  --color-panel-2: #241e18;
+  --color-rail: #1b1611;
+  --color-field: #181410;
+  /* lines */
+  --color-line: #3a3127;
+  --color-line-2: #2a231c;
+  --color-hover: #2c2419;
+  --color-sel: #322617;
+  /* text */
+  --color-ink: #ece4d6;
+  --color-muted: #a89a86;
+  --color-dim: #776b5a;
+  /* accent */
+  --color-accent: #cc8a5c;
+  --color-accent-2: #b9764a;
+  /* status */
+  --color-ok: #92a07c;
+  --color-warn: #c2a368;
+  /* source-type system (SPEC §8.2) */
+  --color-framework: #8b97a3;
+  --color-regulator: #a08a9b;
+  --color-ratings: #c2a368;
+  --color-report: #92a07c;
+  --color-ngo: #7f9173;
+  --color-news: #bd8a76;
+  /* fonts */
+  --font-sans: -apple-system, BlinkMacSystemFont, 'Segoe UI', Inter, Roboto, sans-serif;
+  --font-mono: 'SF Mono', ui-monospace, 'JetBrains Mono', Menlo, Consolas, monospace;
+}
+
+/* rgba tints that aren't plain colors (soft accent, highlight marks) */
+:root {
+  --accent-soft: rgba(204, 138, 92, 0.14);
+  --mark: rgba(204, 138, 92, 0.22);
+  --mark-line: rgba(204, 138, 92, 0.6);
+  --mark-ink: #f6ecdf;
+}
+
+html,
+body,
+#root {
+  height: 100%;
+}
+
+body {
+  margin: 0;
+  background: var(--color-bg);
+  color: var(--color-ink);
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+}
+
+mark {
+  background: var(--mark);
+  color: var(--mark-ink);
+  border-radius: 2px;
+  padding: 0 1px;
+}

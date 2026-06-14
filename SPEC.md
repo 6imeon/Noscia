@@ -45,7 +45,7 @@ The whole point is **vertical, not web-scale**. We are not competing with Google
 
 **Single tenant, one product: a company-internal web app.** It's self-hosted via Docker Compose behind the company's own SSO, serving one shared index to that company — never a hosted, multi-tenant product. *Solo* mode (`uvicorn` + `pnpm dev` on `localhost`) is the **local development loop**, not a separate shipping target; it runs the same code against the same Postgres so dev and prod stay identical. The HTTP-contract-first design (frontend talks only to a typed API) keeps the two interchangeable. Deployment details live in IMPLEMENTATION §9.
 
-**Secrets.** Keys are read from **`.env`** (gitignored) through a one-line `get_secret(name)` helper in `server/secrets.py` — app code never reads `os.environ` directly, so a later swap (per-user keys / Vault, or macOS Keychain for a hardened solo install) touches one function, not every call site. Keys are read per-call and never returned to the browser (masked confirmation only).
+**Secrets.** Keys are read from **`.env`** (gitignored) through a one-line `get_secret(name)` helper in `server/src/noscia/config.py` (not `secrets.py` — that shadows the Python stdlib) — app code never reads `os.environ` directly, so a later swap (per-user keys / Vault, or macOS Keychain for a hardened solo install) touches one function, not every call site. Keys are read per-call and never returned to the browser (masked confirmation only).
 
 **The HTTP contract is the load-bearing decision.** Define request/response types first and keep them stable. It's what makes the desktop port (§12) a drop-in.
 
@@ -57,7 +57,7 @@ The whole point is **vertical, not web-scale**. We are not competing with Google
 |---|---|---|
 | Frontend | React + TypeScript + Vite, **pnpm** | pnpm is the package manager throughout. Tailwind for styling. Runs in the browser, talks to the backend over HTTP. See §11 for the mandatory dependency release-cooldown policy. |
 | Backend | Python 3.11+ + FastAPI | Runs on localhost. Owns crawl, index, search, fine-tune, and the agent loop. Served with `uvicorn`. |
-| Datastore | **Postgres 16** + `pgvector` + `pg_search` (ParadeDB) | One datastore for everything: dense vectors (pgvector/HNSW), BM25 full-text (`pg_search`), **and** relational data — users, saved searches, SSO sessions. Hybrid = pgvector + BM25 fused with RRF in SQL. ParadeDB ships all three in one image. One container to deploy, back up, monitor. Alternative if vector scale ever dominates: a dedicated Qdrant. |
+| Datastore | **Postgres 17** + `pgvector` + `pg_search` (ParadeDB) | One datastore for everything: dense vectors (pgvector/HNSW), BM25 full-text (`pg_search`), **and** relational data — users, saved searches, SSO sessions. Hybrid = pgvector + BM25 fused with RRF in SQL. ParadeDB ships all three in one image. One container to deploy, back up, monitor. Alternative if vector scale ever dominates: a dedicated Qdrant. |
 | Crawl | `crawl4ai` | Playwright-backed, returns clean markdown + metadata. |
 | Embeddings | `sentence-transformers` / Ollama | For inference and fine-tuning. See model note below. |
 | Reranker | `bge-reranker-v2-m3` | Cross-encoder, run in the backend. |
@@ -75,29 +75,42 @@ The whole point is **vertical, not web-scale**. We are not competing with Google
 
 ## 3. Repo layout
 
+Monorepo: a pnpm-workspace TS frontend and a uv-managed Python backend (PyPA **src-layout**, package name `noscia`). Standard hygiene — `tests/`, `ruff`, `.python-version`, CI, `.editorconfig` — is in from day one.
+
 ```
 noscia/
-├── SPEC.md                      ← this file
-├── CLAUDE.md                    ← agent working notes / conventions (create in Phase 0)
+├── SPEC.md  IMPLEMENTATION.md   ← what/why + build plan
+├── CLAUDE.md                    ← agent working notes / conventions (Phase 0)
 ├── README.md
+├── LICENSE                      ← proprietary / company-internal
+├── .editorconfig
+├── .github/workflows/ci.yml     ← lint + test on PR (both ecosystems)
+├── package.json                 ← root workspace (private); scripts: dev / lint / test
 ├── pnpm-workspace.yaml          ← pnpm config incl. release-age cooldown (§11)
 ├── renovate.json                ← cross-ecosystem 7-day update cooldown (§11)
-├── web/                         ← React frontend (browser)
+├── docker-compose.yml           ← Postgres (ParadeDB) for dev; full topology for deploy
+├── web/                         ← React frontend (browser) — Vite + TS, pnpm
+│   ├── package.json
 │   ├── src/App.tsx
 │   ├── src/views/{Search,EntitySearch,Settings,Corpus}.tsx
 │   ├── src/components/
 │   ├── src/lib/api.ts           ← typed client for the backend HTTP contract
 │   └── vite.config.ts
-├── server/                      ← FastAPI backend (localhost)
-│   ├── app.py                   ← entrypoint + route definitions
-│   ├── contract.py              ← request/response models (the stable HTTP contract)
-│   ├── ingest/{crawl.py,chunk.py,index.py,freshness.py}
-│   ├── search/{embed.py,store.py,hybrid.py,rerank.py,highlight.py}
-│   ├── train/{synth.py,finetune.py,eval.py}
-│   ├── agent/{entity_search.py,schema.py,extract.py}
-│   ├── providers/               ← BYOK LLM provider adapters
-│   ├── secrets.py               ← get_secret() — reads .env
-│   └── pyproject.toml
+├── server/                      ← FastAPI backend (localhost) — uv, src-layout
+│   ├── pyproject.toml           ← [project] name=noscia; [tool.ruff] lint config
+│   ├── .python-version          ← pins the interpreter for uv
+│   ├── src/noscia/
+│   │   ├── __init__.py
+│   │   ├── app.py               ← entrypoint + route definitions (uvicorn noscia.app:app)
+│   │   ├── contract.py          ← request/response models (the stable HTTP contract)
+│   │   ├── config.py            ← get_secret() — reads .env (NOT named secrets.py: stdlib clash)
+│   │   ├── user.py              ← CurrentUser provider (SoloUser | HeaderUser)
+│   │   ├── ingest/{crawl.py,chunk.py,index.py,freshness.py}
+│   │   ├── search/{embed.py,store.py,hybrid.py,rerank.py,highlight.py}
+│   │   ├── train/{synth.py,finetune.py,eval.py}
+│   │   ├── agent/{entity_search.py,schema.py,extract.py}
+│   │   └── providers/           ← BYOK LLM provider adapters
+│   └── tests/                   ← pytest
 ├── corpus/
 │   ├── seeds.esg.yaml           ← ESG seed URLs + recrawl cadence
 │   └── eval/esg_queries.jsonl   ← held-out eval set
@@ -161,7 +174,7 @@ Adapters: `anthropic`, `openai`, `openrouter`, `ollama`. Default reasoning model
 - Define the HTTP contract in `server/contract.py` and mirror the types in `web/src/lib/api.ts`.
 - Settings view reads at least one BYOK key from `.env` (via `get_secret()`) and shows it masked.
 - `CLAUDE.md` created with conventions (see §11).
-- **DoD:** `pnpm dev` (frontend) + `uvicorn server.app:app --reload` (backend) both run; `/health` is green from the browser; a key can be saved and retrieved.
+- **DoD:** `pnpm dev` (frontend) + `uvicorn noscia.app:app --reload` (backend) both run; `/health` is green from the browser; a key can be saved and retrieved.
 
 ### Phase 1 — Core ESG search
 - Ingest the ESG seed list (§8) via crawl4ai → chunk → embed (Qwen3-0.6B, 256-dim) → upsert into the Postgres `chunks` table.

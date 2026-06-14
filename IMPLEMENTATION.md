@@ -16,7 +16,7 @@ The SPEC's stack choices were re-checked against the current landscape. **Verdic
 - **The SPEC rule stands:** pick the final model by running nDCG@10 / MRR on *our* ESG corpus, not by leaderboard. Leaderboard scores don't transfer to a narrow vertical.
 
 ### Datastore — Postgres + pgvector + `pg_search` (one datastore, not two)
-- **Decision (June 2026):** consolidate on **Postgres 16**. `pgvector` (HNSW) serves dense ANN; **ParadeDB's `pg_search`** gives true **BM25** full-text inside the same database; relational tables hold users / saved searches / SSO sessions. One container to deploy, back up, monitor — chosen because the product is company-internal (needs a relational DB anyway) and embedded/offline is no longer a requirement.
+- **Decision (June 2026):** consolidate on **Postgres 17**. `pgvector` (HNSW) serves dense ANN; **ParadeDB's `pg_search`** gives true **BM25** full-text inside the same database; relational tables hold users / saved searches / SSO sessions. One container to deploy, back up, monitor — chosen because the product is company-internal (needs a relational DB anyway) and embedded/offline is no longer a requirement.
 - **ParadeDB** ships Postgres + `pgvector` + `pg_search` in one image — use it (or vanilla Postgres + both extensions). HNSW (`<=>` cosine) and a `bm25` index coexist on the `chunks` table.
 - **Hybrid is hand-rolled but well-trodden:** dense and BM25 prefetch as two CTEs, fused with **RRF in SQL** (ParadeDB documents this pattern), then the cross-encoder reranks the fused top-k. Slightly more code than LanceDB's one-liner — the tradeoff for collapsing to a single datastore.
 - **Implication:** Phase 1 = a `chunks` schema + migration, an indexing upsert, one hybrid SQL query, app-side RRF (or SQL RRF), the cross-encoder rerank step, and the highlight step. All behind a `VectorStore` interface so the store stays swappable (see §9.3).
@@ -53,7 +53,7 @@ These come from SPEC §11 and the project's standing rules. Bake them in at init
 1. **pnpm + 7-day release cooldown.** `pnpm-workspace.yaml` → `minimumReleaseAge: 10080`; `renovate.json` → `"minimumReleaseAge": "7 days"`. Commit all lockfiles. At init, if a brand-new version won't install, pin the most recent version already >7 days old — don't disable the policy.
 2. **No AI attribution in git.** Plain commit messages and PR bodies — never a `Co-Authored-By: Claude` line or "Generated with Claude Code" footer.
 3. **HTTP contract first.** Write `server/contract.py` and mirror it in `web/src/lib/api.ts` before implementing either side.
-4. **Secrets never touch the browser, never sit in plaintext/source.** The demo reads keys from **`.env`** (gitignored) via a one-line `get_secret()` helper in `server/secrets.py` — app code calls `get_secret("openrouter")`, never `os.environ` directly, so a later swap (per-user keys / Vault) touches one function, not every call site. Keys are read per-call; the browser only ever sees a masked confirmation. See §9.3.
+4. **Secrets never touch the browser, never sit in plaintext/source.** The demo reads keys from **`.env`** (gitignored) via a one-line `get_secret()` helper in `server/src/noscia/config.py` (named `config.py`, not `secrets.py`, to avoid shadowing the Python stdlib) — app code calls `get_secret("openrouter")`, never `os.environ` directly, so a later swap (per-user keys / Vault) touches one function, not every call site. Keys are read per-call; the browser only ever sees a masked confirmation. See §9.3.
 5. **Search works without a key.** Local embeddings + local index = offline search. Only reasoning (entity search, synthetic data gen) needs BYOK.
 6. **Evidence-or-null extraction.** The entity agent never emits a field it can't cite.
 7. **Eval-gated model changes.** Any embedding/reranker swap is gated on nDCG@10 / MRR vs `corpus/eval/esg_queries.jsonl`.
@@ -66,7 +66,7 @@ These come from SPEC §11 and the project's standing rules. Bake them in at init
 - **Node + pnpm:** pnpm **11+** (for the native release-cooldown default). `corepack enable pnpm` or `npm i -g pnpm@latest`.
 - **Python 3.11+** with a fast env manager — **`uv`** recommended (fast, hashable lockfile that pairs with the Renovate cooldown).
 - **Playwright/Chromium** for crawl4ai: installed via `crawl4ai-setup` after the backend deps land.
-- **Postgres 16 with `pgvector` + `pg_search`** — easiest is the **ParadeDB** Docker image (bundles both extensions); run it via `docker compose` even for the local dev loop so dev == prod. Connect with `DATABASE_URL`.
+- **Postgres 17 with `pgvector` + `pg_search`** — easiest is the **ParadeDB** Docker image (bundles both extensions); run it via `docker compose` even for the local dev loop so dev == prod. Connect with `DATABASE_URL`.
 - **Ollama** (optional but easy) for local embeddings: `ollama pull qwen3-embedding`.
 - **Git** — initialize the repo; remember rule #2 (no AI attribution).
 
@@ -89,13 +89,13 @@ This is the literal starting sequence. Each step maps to a checklist item in §7
 - Build the shell: 62px icon **Rail** + view router, and the four views as empty shells `src/views/{Search,EntitySearch,Corpus,Settings}.tsx` (see §8.3–8.4).
 - Verify `pnpm dev` boots to the espresso-shell console with an empty Search split-pane.
 
-**Step 2 — backend skeleton (`server/`):**
-- Create `server/` with `pyproject.toml`; deps: `fastapi`, `uvicorn[standard]`, `python-dotenv`, `pydantic`, `psycopg[binary]` (+ `pgvector`), `sqlalchemy` (or `asyncpg`). Use `uv` to add + lock (respect the cooldown; pin >7-day-old versions).
-- `app.py` with `GET /health` that returns `{"status":"ok"}` **and runs `SELECT 1` against Postgres**, and CORS allowing the Vite dev origin.
-- Run `uvicorn server.app:app --reload`.
+**Step 2 — backend skeleton (`server/`, PyPA src-layout):**
+- `uv init` a project named `noscia` with src-layout → package at `server/src/noscia/`, `pyproject.toml` + `.python-version` (3.12) at `server/`. Deps: `fastapi`, `uvicorn[standard]`, `python-dotenv`, `pydantic`, `psycopg[binary]` (+ `pgvector`), `sqlalchemy` (or `asyncpg`); dev deps `ruff`, `pytest`. Use `uv add` + lock (respect the cooldown; pin >7-day-old versions). Configure `[tool.ruff]` in `pyproject.toml`.
+- `noscia/app.py` with `GET /health` that returns `{"status":"ok"}` **and runs `SELECT 1` against Postgres**, and CORS allowing the Vite dev origin.
+- Run `uvicorn noscia.app:app --reload` (from `server/`, with the venv active).
 
 **Step 2.5 — Postgres up (the datastore):**
-- `docker-compose.yml` with a `postgres` service on the **ParadeDB** image (Postgres 16 + `pgvector` + `pg_search`); a named volume `pgdata/`.
+- `docker-compose.yml` with a `postgres` service on the **ParadeDB** image (Postgres 17 + `pgvector` + `pg_search`); a named volume `pgdata/`.
 - An init migration runs `CREATE EXTENSION IF NOT EXISTS vector; CREATE EXTENSION IF NOT EXISTS pg_search;`. Set `DATABASE_URL` in `.env`.
 - `docker compose up postgres` and confirm `/health` goes green (DB reachable). Run this in the dev loop too — dev == prod.
 
@@ -107,7 +107,7 @@ This is the literal starting sequence. Each step maps to a checklist item in §7
 - Frontend calls `/health` on load and shows a green/red status pill. This proves the HTTP path end-to-end.
 
 **Step 5 — `.env` BYOK:**
-- `server/secrets.py` exposes `get_secret(name)` — loads `.env` (via `python-dotenv`) and returns the value; app code calls this, never `os.environ` directly.
+- `server/src/noscia/config.py` exposes `get_secret(name)` — loads `.env` (via `python-dotenv`) and returns the value; app code calls this, never `os.environ` directly.
 - Settings view: read one key via `get_secret()` → backend returns only a masked confirmation, never the raw key to the browser. Ship `.env.example` with `OPENROUTER_API_KEY=` and `DATABASE_URL=`.
 
 **Phase 0 DoD:** `docker compose up postgres` brings the DB up; `pnpm dev` + `uvicorn` both run; `/health` is green from the browser (incl. the DB ping); an OpenRouter key from `.env` round-trips through `get_secret()` (masked in the UI). Versions recorded in `CLAUDE.md`.
@@ -149,21 +149,21 @@ Build Phase 1 thin and end-to-end first (a handful of seed URLs, one query, visi
 ## 7. Phase checklist (working tracker)
 
 ### Phase 0 — Skeleton + guardrails
-- [ ] `git init`; `.gitignore` covers `data/`, `node_modules/`, caches; **no AI attribution in commits**
-- [ ] `pnpm-workspace.yaml` with `minimumReleaseAge: 10080`, `minimumReleaseAgeExclude: []`, `blockExoticSubdeps: true`
-- [ ] `renovate.json` with `"minimumReleaseAge": "7 days"`, `"internalChecksFilter": "strict"`, `"automerge": false`
-- [ ] `CLAUDE.md` created from SPEC §11 + pinned-versions table
-- [ ] `web/` scaffolded (Vite + React + TS + Tailwind, pnpm); boots to empty search UI
-- [ ] `server/` scaffolded (FastAPI + uvicorn); `GET /health` returns ok **and pings Postgres**; CORS set for Vite origin
-- [ ] `docker-compose.yml` with a **`postgres`** service (ParadeDB image); `CREATE EXTENSION vector, pg_search`; used by the dev loop too so dev == prod. (web / api / embeddings-TEI / ingest / reverse-proxy services are added for the company deployment — tracked in §9, **not built for the demo**)
-- [ ] `server/contract.py` defines Phase 1 request/response models
-- [ ] `web/src/lib/api.ts` mirrors the contract types exactly
-- [ ] Frontend shows live `/health` status pill (end-to-end HTTP + DB proven)
-- [ ] `server/secrets.py` exposes a one-line `get_secret(name)` helper that reads from `.env`; Settings reads one key via it (masked on read). Ship `.env.example` with `OPENROUTER_API_KEY` + `DATABASE_URL`
-- [ ] `server/user.py` exposes a `CurrentUser` provider (`SoloUser` now; `HeaderUser` stub for later SSO) — saved-data code keys off it
-- [ ] `server/search/store.py` defines the `VectorStore` interface (impl lands in Phase 1) — so the store stays swappable from day one (§9.3)
-- [ ] OpenRouter wired as the default provider (one key → many models); other providers selectable but optional
-- [ ] **DoD:** `docker compose up` brings Postgres up; `pnpm dev` + `uvicorn` run; `/health` green in browser (incl. DB); an OpenRouter key from `.env` round-trips through `get_secret()` (masked in the UI)
+- [x] `git init`; `.gitignore` covers `data/`, `node_modules/`, caches; **no AI attribution in commits**
+- [x] `pnpm-workspace.yaml` with `minimumReleaseAge: 10080`, `minimumReleaseAgeExclude: []`, `blockExoticSubdeps: true`
+- [x] `renovate.json` with `"minimumReleaseAge": "7 days"`, `"internalChecksFilter": "strict"`, `"automerge": false`
+- [x] `CLAUDE.md` created from SPEC §11 + pinned-versions table
+- [x] `web/` scaffolded (Vite + React + TS + Tailwind, pnpm); boots to empty search UI
+- [x] `server/` scaffolded (FastAPI + uvicorn); `GET /health` returns ok **and pings Postgres**; CORS set for Vite origin
+- [x] `docker-compose.yml` with a **`postgres`** service (ParadeDB image); `CREATE EXTENSION vector, pg_search`; used by the dev loop too so dev == prod. (web / api / embeddings-TEI / ingest / reverse-proxy services are added for the company deployment — tracked in §9, **not built for the demo**)
+- [x] `server/contract.py` defines Phase 1 request/response models
+- [x] `web/src/lib/api.ts` mirrors the contract types exactly
+- [x] Frontend shows live `/health` status pill (end-to-end HTTP + DB proven)
+- [x] `server/src/noscia/config.py` exposes a one-line `get_secret(name)` helper that reads from `.env`; Settings reads one key via it (masked on read). Ship `.env.example` with `OPENROUTER_API_KEY` + `DATABASE_URL`
+- [x] `server/src/noscia/user.py` exposes a `CurrentUser` provider (`SoloUser` now; `HeaderUser` stub for later SSO) — saved-data code keys off it
+- [x] `server/src/noscia/search/store.py` defines the `VectorStore` interface (impl lands in Phase 1) — so the store stays swappable from day one (§9.3)
+- [x] OpenRouter wired as the default provider (one key → many models); other providers selectable but optional
+- [x] **DoD:** `docker compose up` brings Postgres up; `pnpm dev` + `uvicorn` run; `/health` green in browser (incl. DB); an OpenRouter key from `.env` round-trips through `get_secret()` (masked in the UI)
 
 ### Phase 1 — Core ESG search
 - [ ] `corpus/seeds.esg.yaml` populated with concrete ESG seed URLs grouped by `source_type` + cadence
@@ -328,7 +328,7 @@ The full interactive reference lives at [design/mockups/design-1-research-consol
 ### 9.3 Do this from Phase 0 so the future stays additive
 Abstract the three things that may change later — don't thread store, secret-source, or single-user assumptions through app code:
 - **`VectorStore`** interface → `PgVectorStore` (the only impl now). App/agent code calls `store.hybrid_search(...)` / `store.upsert(...)`, never raw SQL scattered around — so a later dedicated engine (Qdrant) is a contained swap, not a rewrite.
-- **Secrets** → a one-line `get_secret(name)` in `server/secrets.py` that reads `.env`. App code calls `get_secret("openrouter")`, never `os.environ` directly — so per-user keys / Vault later swap one function, not every call site. Still just `.env` for now.
+- **Secrets** → a one-line `get_secret(name)` in `server/src/noscia/config.py` that reads `.env`. App code calls `get_secret("openrouter")`, never `os.environ` directly — so per-user keys / Vault later swap one function, not every call site. Still just `.env` for now.
 - **`CurrentUser`** provider → `SoloUser` (always "me", for the dev loop) | `HeaderUser` (reads the SSO identity header in the company deployment). Saved-data code keys off this, never assumes one user.
 
 Everything else — the entire crawl → index → search → entity pipeline and the Research Console UI (§8) — is **identical** between the dev loop and the deployed app. Settings gains only an admin/user split (admins manage sources + keys; users search) once SSO lands.

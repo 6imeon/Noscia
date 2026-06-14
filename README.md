@@ -6,11 +6,20 @@ A vertical, ESG-domain neural search app — Exa-style retrieval over a curated 
 
 - **[SPEC.md](SPEC.md)** — what the product is and why (architecture, search pipeline, entity search, constraints).
 - **[IMPLEMENTATION.md](IMPLEMENTATION.md)** — current build plan: verified stack research, hard constraints, phase-by-phase checklist, the selected frontend design (§8), and deployment targets (§9).
+- **[CHANGELOG.md](CHANGELOG.md)** — what changed, updated at the end of each phase.
 - **[design/mockups/](design/mockups/)** — interactive UI explorations. Selected direction: `design-1-research-console.html`.
 
 ## Status
 
-Pre-Phase-0 — planning and design. No application code yet. See IMPLEMENTATION.md §7 for the working tracker.
+Phase 0 (skeleton + guardrails) complete. See [CHANGELOG.md](CHANGELOG.md) for what landed and [IMPLEMENTATION.md](IMPLEMENTATION.md) §7 for the working tracker.
+
+### Run the dev loop
+
+```bash
+docker compose up -d postgres                       # datastore (pgvector + pg_search)
+cd server && uv sync && uv run uvicorn noscia.app:app --reload   # API on :8000
+pnpm install && pnpm dev                             # web on :5180 (proxies /api → :8000)
+```
 
 ## Stack (planned)
 

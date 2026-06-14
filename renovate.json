@@ -1,0 +1,16 @@
+{
+  "$schema": "https://docs.renovatebot.com/renovate-schema.json",
+  "extends": ["config:recommended"],
+  "minimumReleaseAge": "7 days",
+  "internalChecksFilter": "strict",
+  "automerge": false,
+  "rangeStrategy": "pin",
+  "lockFileMaintenance": { "enabled": true },
+  "packageRules": [
+    {
+      "description": "7-day cooldown applies across every ecosystem (npm/pnpm, PyPI, Cargo).",
+      "matchManagers": ["npm", "pep621", "pip_requirements", "cargo"],
+      "minimumReleaseAge": "7 days"
+    }
+  ]
+}

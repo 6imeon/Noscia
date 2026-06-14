@@ -1,4 +1,4 @@
-# secrets — never commit (see IMPLEMENTATION §9: .env holds the demo provider key)
+# secrets — never commit (IMPLEMENTATION §9: .env holds the demo provider key + DATABASE_URL)
 .env
 .env.*
 !.env.example
@@ -12,17 +12,18 @@ venv/
 .pytest_cache/
 .ruff_cache/
 .mypy_cache/
+*.egg-info/
+dist/
 
 # node / pnpm
 node_modules/
 .pnpm-store/
-dist/
+web/dist/
 build/
 *.tsbuildinfo
 
-# data, index, model caches (local-first artifacts)
+# datastore + model/crawl caches (Postgres volume, HF cache — not source)
 data/
-*.lance/
 .cache/
 models/
 *.safetensors
