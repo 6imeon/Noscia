@@ -59,14 +59,28 @@ export function Search() {
         />
       </div>
 
-      {status.kind === 'done' && <AnswerBanner data={status.data} onSelect={setSelected} />}
-
       <div className="grid min-h-0 flex-1 grid-cols-[minmax(0,1fr)_minmax(0,1.4fr)]">
         <section className="min-h-0 overflow-auto border-r border-line">
           <ResultList status={status} selected={selected} onSelect={setSelected} />
         </section>
-        <section className="min-h-0 overflow-auto">
-          <PassageReader result={selected} />
+        {/* Right pane split: synthesized answer on top, the clicked source below. */}
+        <section className="flex min-h-0 flex-col">
+          <div className="min-h-0 basis-1/2 overflow-hidden border-b border-line">
+            {status.kind === 'done' ? (
+              <AnswerBanner
+                data={status.data}
+                onSelect={setSelected}
+                keyConfigured={keyConfigured}
+              />
+            ) : (
+              <div className="p-6 text-sm text-dim">
+                Run a search — the synthesized answer appears here.
+              </div>
+            )}
+          </div>
+          <div className="min-h-0 flex-1 overflow-auto">
+            <PassageReader result={selected} />
+          </div>
         </section>
       </div>
     </div>

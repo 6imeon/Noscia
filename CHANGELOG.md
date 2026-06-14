@@ -93,8 +93,9 @@ now a **site section**, not one page.
   honest "no direct answer in the corpus") when they don't contain it. BYOK via `get_secret`
   (no key ⇒ no answer, no error). Contract grew `SearchRequest.summarize` +
   `SearchResponse.answer` / `answer_citations` / `summarized`; the UI adds a key-gated
-  **✦ AI answers** toggle (on by default when a key is present) and an answer banner above
-  the results whose `[n]` chips jump to the cited passage.
+  **✦ AI answers** toggle (on by default when a key is present). The right pane is split:
+  the synthesized answer sits on top (its `[n]` chips open the cited source), the clicked
+  source passage reads below — answer always in view, evidence on demand.
 - **Model pre-warm (`app.py` lifespan)** — the embedder + cross-encoder are lazy +
   `lru_cache`'d, so the *first* search used to pay the full ≈1 GB cold-start (minutes on
   CPU). A daemon thread now loads them at boot (off the request path; boot stays instant,
