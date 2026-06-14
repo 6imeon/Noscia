@@ -1,6 +1,6 @@
 # Noscia
 
-A vertical, ESG-domain neural search app — Exa-style retrieval over a curated sustainability corpus, with cited passages and an agentic entity-search mode. Local-first; optionally self-hosted for a single company.
+A vertical, ESG-domain neural search app — Exa-style retrieval over a curated sustainability corpus, with cited passages and an agentic entity-search mode. A company-internal tool: self-hosted via Docker behind the company's SSO, one shared index. Runs locally (`uvicorn` + `pnpm dev`) for development.
 
 ## Documents
 
@@ -14,4 +14,4 @@ Pre-Phase-0 — planning and design. No application code yet. See IMPLEMENTATION
 
 ## Stack (planned)
 
-React + TypeScript + Vite (pnpm) · Python + FastAPI · LanceDB hybrid (vector + BM25) · crawl4ai · Qwen3-Embedding-0.6B · bge-reranker-v2-m3 · BYOK LLM providers.
+React + TypeScript + Vite (pnpm) · Python + FastAPI · Postgres + pgvector + `pg_search` BM25 (one datastore) · crawl4ai · Qwen3-Embedding-0.6B · bge-reranker-v2-m3 · BYOK LLM providers.

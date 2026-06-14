@@ -10,9 +10,9 @@
 
 ## 0. What this is
 
-Noscia is a self-contained, Exa-style neural search engine. It crawls a scoped corpus, embeds it with a (later fine-tuned) open embedding model, serves hybrid dense+sparse retrieval from an embedded vector store, reranks with a cross-encoder, and returns query-relevant highlighted passages. On top of that sits an agentic "entity search" mode that produces structured, cited tables of entities — the personal-scale equivalent of Exa Websets.
+Noscia is a self-contained, Exa-style neural search engine. It crawls a scoped corpus, embeds it with a (later fine-tuned) open embedding model, serves hybrid dense+sparse retrieval from **Postgres (pgvector + `pg_search` BM25)**, reranks with a cross-encoder, and returns query-relevant highlighted passages. On top of that sits an agentic "entity search" mode that produces structured, cited tables of entities — the company-internal equivalent of Exa Websets.
 
-**Build it as a local web app first.** A browser can't crawl, run ML models, or host the vector store, so "web app" here means a React frontend talking over HTTP to a local backend service that does the work. That backend is the same service that a future desktop build would bundle — so going desktop later is additive, not a rewrite (§12).
+**It's a web app.** A browser can't crawl, run ML models, or reach the database, so "web app" here means a React frontend talking over HTTP to a backend service that does the work. The product is **company-internal**: self-hosted via Docker Compose behind the company's SSO, one shared Postgres-backed index. The same backend also runs locally (`uvicorn` + `pnpm dev`) as the development loop — see §1 and IMPLEMENTATION §9.
 
 The whole point is **vertical, not web-scale**. We are not competing with Google or Exa on coverage. We own a bounded ESG corpus, fine-tune a small model on it, and beat a general-purpose model *inside that domain*.
 
@@ -35,17 +35,17 @@ The whole point is **vertical, not web-scale**. We are not competing with Google
 │  ─ corpus / index status               │        │  ─ embedding fine-tune + eval          │
 │                                        │        │  ─ agentic ESG entity-search loop      │
 │  Talks only to localhost:<port>        │        │  ─ LLM calls (BYOK providers)          │
-└────────────────────────────────────────┘        │  ─ secrets via macOS Keychain (keyring)│
+└────────────────────────────────────────┘        │  ─ secrets via .env (get_secret helper)│
                                                    │                                        │
-                                                   │  Embedded, on-disk, local-first:       │
-                                                   │  ─ LanceDB (vector + full-text/BM25)   │
+                                                   │  Backing services (Docker / local):    │
+                                                   │  ─ Postgres: pgvector + pg_search BM25 │
                                                    │  ─ model cache                         │
                                                    └────────────────────────────────────────┘
 ```
 
-**Single tenant, two deployment targets.** The same FastAPI backend + React frontend runs either *solo* (local-first: `uvicorn` + `pnpm dev`, open `localhost`, secrets in Keychain) or *internal-shared* (one company self-hosts it via Docker Compose behind its own SSO, one shared index, secrets server-side). Either way it's single-tenant — never a hosted multi-tenant product. The HTTP-contract-first design (frontend talks only to a typed API) is what lets the same code serve both. Shared-target details live in IMPLEMENTATION §9.
+**Single tenant, one product: a company-internal web app.** It's self-hosted via Docker Compose behind the company's own SSO, serving one shared index to that company — never a hosted, multi-tenant product. *Solo* mode (`uvicorn` + `pnpm dev` on `localhost`) is the **local development loop**, not a separate shipping target; it runs the same code against the same Postgres so dev and prod stay identical. The HTTP-contract-first design (frontend talks only to a typed API) keeps the two interchangeable. Deployment details live in IMPLEMENTATION §9.
 
-**Secrets.** Abstracted behind a `SecretStore` interface so the backend never hard-codes one mechanism. Solo target → macOS Keychain via `keyring` (keys never on disk). Shared target → server secrets (`.env` for the demo; Vault / per-user encrypted store later). Keys are read per-call and never returned to the browser (masked confirmation only).
+**Secrets.** Keys are read from **`.env`** (gitignored) through a one-line `get_secret(name)` helper in `server/secrets.py` — app code never reads `os.environ` directly, so a later swap (per-user keys / Vault, or macOS Keychain for a hardened solo install) touches one function, not every call site. Keys are read per-call and never returned to the browser (masked confirmation only).
 
 **The HTTP contract is the load-bearing decision.** Define request/response types first and keep them stable. It's what makes the desktop port (§12) a drop-in.
 
@@ -57,13 +57,13 @@ The whole point is **vertical, not web-scale**. We are not competing with Google
 |---|---|---|
 | Frontend | React + TypeScript + Vite, **pnpm** | pnpm is the package manager throughout. Tailwind for styling. Runs in the browser, talks to the backend over HTTP. See §11 for the mandatory dependency release-cooldown policy. |
 | Backend | Python 3.11+ + FastAPI | Runs on localhost. Owns crawl, index, search, fine-tune, and the agent loop. Served with `uvicorn`. |
-| Vector store | LanceDB (embedded) | On-disk, Python bindings, native vector + full-text (BM25) search → hybrid in one store. No server to run. Alternative: Qdrant local mode if native binary quantization is wanted. |
+| Datastore | **Postgres 16** + `pgvector` + `pg_search` (ParadeDB) | One datastore for everything: dense vectors (pgvector/HNSW), BM25 full-text (`pg_search`), **and** relational data — users, saved searches, SSO sessions. Hybrid = pgvector + BM25 fused with RRF in SQL. ParadeDB ships all three in one image. One container to deploy, back up, monitor. Alternative if vector scale ever dominates: a dedicated Qdrant. |
 | Crawl | `crawl4ai` | Playwright-backed, returns clean markdown + metadata. |
 | Embeddings | `sentence-transformers` / Ollama | For inference and fine-tuning. See model note below. |
 | Reranker | `bge-reranker-v2-m3` | Cross-encoder, run in the backend. |
-| Secrets | macOS Keychain via Python `keyring` | Never write keys to disk in plaintext. |
+| Secrets | `.env` via a `get_secret()` helper | Gitignored; never returned to the browser. Keychain/Vault are later swaps behind the same helper. |
 | LLM providers (BYOK) | Anthropic, OpenAI, OpenRouter, Ollama | Pluggable provider interface (see §6). |
-| **Future: desktop shell** | **Tauri 2 (Rust core + same web frontend)** | **Deferred — see §12. Optionally moves the search hot path into Rust (`fastembed-rs` + `lancedb` crate).** |
+| **Future: desktop shell** | **Tauri 2 (Rust core + same web frontend)** | **Out of scope — see §12. The product is the company-internal web app; desktop is only a possible future direction.** |
 
 **Embedding model — current recommendation (verify at build time, the landscape moves fast):**
 - **Default local:** `Qwen3-Embedding-0.6B` (open weight, Apache-2.0, strong for its size). Runs locally via Ollama or sentence-transformers. Use Matryoshka truncation to 256 dims and renormalize.
@@ -96,12 +96,12 @@ noscia/
 │   ├── train/{synth.py,finetune.py,eval.py}
 │   ├── agent/{entity_search.py,schema.py,extract.py}
 │   ├── providers/               ← BYOK LLM provider adapters
-│   ├── secrets.py               ← keyring (Keychain) access
+│   ├── secrets.py               ← get_secret() — reads .env
 │   └── pyproject.toml
 ├── corpus/
 │   ├── seeds.esg.yaml           ← ESG seed URLs + recrawl cadence
 │   └── eval/esg_queries.jsonl   ← held-out eval set
-├── data/                        ← LanceDB dir, model cache (gitignored)
+├── data/                        ← Postgres volume, model cache (gitignored)
 └── src-tauri/                   ← FUTURE (§12): Tauri desktop shell. Not built until Phase 4.
 ```
 
@@ -109,20 +109,20 @@ noscia/
 
 ## 4. Data model
 
-**Chunk record (LanceDB row):**
+**Chunk record (`chunks` table in Postgres):**
 ```
-id:            stable hash of (url + chunk_index)
+id:            stable hash of (url + chunk_index)   — primary key
 url:           source URL
 title:         page title
 source_type:   "report" | "framework" | "regulator" | "news" | "ngo"
 crawled_at:    ISO timestamp
 content_hash:  hash of chunk text (for change detection)
 text:          chunk text (~512 tokens, ~64 overlap)
-dense:         f32[256]  (matryoshka-truncated, normalized)
-sparse:        BM25 sparse vector (native LanceDB FTS)
+dense:         vector(256)   (pgvector; matryoshka-truncated, normalized; HNSW index)
+               BM25 is indexed directly on `text` via a pg_search bm25 index — no stored sparse column
 ```
 
-**Index lifecycle:** insert/update by `id` (upsert). On recrawl, re-embed only chunks whose `content_hash` changed; delete rows for URLs no longer present.
+**Index lifecycle:** `INSERT … ON CONFLICT (id) DO UPDATE` (upsert). On recrawl, re-embed only chunks whose `content_hash` changed; delete rows for URLs no longer present.
 
 ---
 
@@ -130,7 +130,7 @@ sparse:        BM25 sparse vector (native LanceDB FTS)
 
 Online query path:
 1. Embed the query (same model, `search_query:` prefix for Qwen3, truncate→normalize).
-2. **Dense prefetch** (top ~100 by cosine) + **sparse/BM25 prefetch** (top ~100) from LanceDB.
+2. **Dense prefetch** (top ~100 by cosine, pgvector `<=>`) + **BM25 prefetch** (top ~100, `pg_search`) — two CTEs in one Postgres query.
 3. **Fuse** with Reciprocal Rank Fusion (RRF).
 4. **Rerank** top ~50 fused candidates with `bge-reranker-v2-m3` cross-encoder.
 5. **Highlights:** return the best-matching passage(s) per result, not the whole page (token-efficient, Exa-style).
@@ -143,7 +143,7 @@ Online query path:
 
 ## 6. BYOK provider interface
 
-One interface, four adapters. Keys live in Keychain (via `keyring`); the backend reads them at call time, never persists them elsewhere.
+One interface, four adapters. Keys live in `.env` (read via `get_secret()`); the backend reads them at call time, never returns them to the browser.
 
 ```python
 class LLMProvider(Protocol):
@@ -159,12 +159,12 @@ Adapters: `anthropic`, `openai`, `openrouter`, `ollama`. Default reasoning model
 ### Phase 0 — Skeleton
 - Scaffold `web/` (Vite + React + TS, **pnpm**) and `server/` (FastAPI). Frontend boots to an empty search UI and reaches the backend `/health` over HTTP.
 - Define the HTTP contract in `server/contract.py` and mirror the types in `web/src/lib/api.ts`.
-- Settings view stores at least one BYOK key in the Keychain (via `keyring`) and reads it back.
+- Settings view reads at least one BYOK key from `.env` (via `get_secret()`) and shows it masked.
 - `CLAUDE.md` created with conventions (see §11).
 - **DoD:** `pnpm dev` (frontend) + `uvicorn server.app:app --reload` (backend) both run; `/health` is green from the browser; a key can be saved and retrieved.
 
 ### Phase 1 — Core ESG search
-- Ingest the ESG seed list (§8) via crawl4ai → chunk → embed (Qwen3-0.6B, 256-dim) → write to LanceDB.
+- Ingest the ESG seed list (§8) via crawl4ai → chunk → embed (Qwen3-0.6B, 256-dim) → upsert into the Postgres `chunks` table.
 - Implement the §5 pipeline (hybrid + RRF + rerank + highlights) in the backend.
 - UI: query box → ranked results with highlighted passages, source title/URL, fast/quality toggle.
 - Corpus view: index size, last crawl time, per-source counts.
@@ -172,7 +172,7 @@ Adapters: `anthropic`, `openai`, `openrouter`, `ollama`. Default reasoning model
 
 ### Phase 2 — Quality + freshness (addresses caveats 1 & 2)
 - **Fine-tune:** `train/synth.py` uses a BYOK LLM to generate ~3–5 synthetic queries per chunk; `train/finetune.py` fine-tunes Qwen3-0.6B on those pairs; `train/eval.py` reports nDCG@10 / MRR on `corpus/eval/esg_queries.jsonl` vs the base model. Ship the fine-tuned model if it wins.
-- **ColBERT + MUVERA (optional quality mode):** add a late-interaction index path with MUVERA fixed-dimensional encodings so multi-vector retrieval runs through the same single-vector store. Opt-in toggle.
+- **ColBERT + MUVERA (optional quality mode):** add a late-interaction path with MUVERA fixed-dimensional encodings so multi-vector retrieval collapses to a single pgvector column — no second store. Opt-in toggle. (If multi-vector ever becomes the primary ranker, that's the point to weigh a dedicated Qdrant with native multivectors.)
 - **Incremental crawl:** sitemap `lastmod` + HTTP `ETag`/`If-Modified-Since` (304 short-circuit) + `content_hash` diffing + adaptive recrawl cadence per source (news hourly, frameworks monthly). Upsert deltas only.
 - **Live-search fallback:** when index confidence is low or the query is clearly outside the corpus, call a BYOK agentic search API (Exa / Tavily / Firecrawl) and merge results, clearly labeled as live vs indexed.
 - **DoD:** fine-tuned model beats base on the eval set; recrawl re-embeds only changed chunks; out-of-corpus queries gracefully fall back to live search.
@@ -240,7 +240,7 @@ Make the schema declarative so other entity types (funds, sectors) can be added 
 
 ## 11. Conventions (put in `CLAUDE.md`)
 
-- **Pin versions at init.** FastAPI, lancedb, crawl4ai, the embedding model (and later Tauri/fastembed-rs) all move quickly. Record exact versions in `CLAUDE.md` and verify the current best small open embedding model before committing to one.
+- **Pin versions at init.** FastAPI, pgvector/`pg_search` (ParadeDB), crawl4ai, the embedding model all move quickly. Record exact versions in `CLAUDE.md` and verify the current best small open embedding model before committing to one.
 - **pnpm everywhere on the JS side.** Use pnpm, not npm or yarn. Commit `pnpm-lock.yaml`.
 - **7-day dependency release cooldown (mandatory, supply-chain defense).** Newly published package versions must be at least 7 days old before they can be installed. Most malicious releases (account hijacks, typosquats, poisoned patches) are detected and yanked within hours, so a 7-day delay puts the build outside the attacker's window at zero cost. Enforced in two layers:
   - **pnpm** (native, covers the npm ecosystem) — in `pnpm-workspace.yaml`. `minimumReleaseAge` is in **minutes**; 7 days = `10080`. pnpm 11 already defaults this to `1440` (1 day); we raise it.
@@ -263,7 +263,7 @@ Make the schema declarative so other entity types (funds, sectors) can be added 
   - **Never auto-merge a fresh release.** Lockfiles (`pnpm-lock.yaml`, `uv.lock`/hashed requirements, and later `Cargo.lock`) are committed and treated as the trusted base. Emergency security fixes bypass the cooldown only via an explicit, reviewed exclude entry — never by disabling the policy globally.
   - *Note:* the cooldown can make a brand-new version temporarily un-installable, most noticeably at project init. That's the policy working — pin to the most recent version already older than 7 days rather than excluding it.
 - **HTTP contract first.** Define `server/contract.py` ⇄ `web/src/lib/api.ts` before implementing either side. This is what keeps the desktop port (§12) mechanical.
-- **Secrets never touch disk.** Keychain via `keyring` only; the backend fetches keys per-call.
+- **Secrets never touch the browser.** Read from `.env` via `get_secret()`; `.env` is gitignored; the backend fetches keys per-call and only ever returns a masked confirmation.
 - **Search runs without a key.** Local embeddings + local index mean plain search works offline; only the reasoning model (entity search, synthetic data gen) needs BYOK.
 - **Evidence-or-null in extraction.** The entity agent must never emit a field it can't cite. A blank cell beats a hallucinated one.
 - **Eval before shipping a model.** Any embedding change is gated on nDCG@10/MRR against `corpus/eval/esg_queries.jsonl`.
@@ -277,16 +277,15 @@ The web app and a macOS desktop app share the **same backend** — the differenc
 
 - **Shell:** wrap the existing React frontend in **Tauri 2** (Rust core + the same web UI).
 - **Backend launch:** instead of the user running `uvicorn`, the Rust core spawns the FastAPI backend as a **bundled sidecar** (packaged with PyInstaller) and supervises it. The frontend still calls `localhost` — no frontend change.
-- **Optional speed:** port the search hot path (embed/store/hybrid/rerank) into Rust using `fastembed-rs` + the `lancedb` crate, so plain search needs no Python at runtime. The Python sidecar then only handles ingest, fine-tune, and the agent loop.
-- **Distribution:** macOS **codesigning + notarization** (Apple Developer ID) for the app bundle and the bundled sidecar binary — required to run on machines other than your own. This is the main added cost of going desktop.
+- **Distribution:** macOS **codesigning + notarization** (Apple Developer ID) for the app bundle and the bundled sidecar binary. This is the main added cost of going desktop.
 
-Do this only when you want a distributable native artifact; it is not needed for the demo.
+**Status: out of scope.** The product is the company-internal web app (§1); desktop is not a current target, and Postgres being a server (not an embeddable file store) makes a bundled single-binary desktop build more involved than it was under the old embedded-store plan. Kept here only as a possible future direction.
 
 ---
 
 ## 13. Open questions to resolve early
 - Final embedding model after the on-corpus eval (Qwen3-0.6B vs 4B vs an API model).
-- LanceDB vs Qdrant-local once the binary-quantization need is measured against the demo corpus size.
+- Whether Postgres (pgvector + `pg_search`) holds up at the company's corpus size, or a dedicated vector engine (Qdrant) is eventually warranted — decided by measured QPS/recall, not upfront.
 - Whether ColBERT+MUVERA earns its place for a corpus this small, or whether fine-tuned single-vector is already enough.
 - Confirm the product name and clear it (npm/PyPI/crates scope, domain, trademark) before it propagates through the codebase.
 
@@ -295,5 +294,5 @@ Do this only when you want a distributable native artifact; it is not needed for
 ## 14. Non-goals
 - Web-scale crawling or coverage.
 - Competing with Exa/Google on breadth.
-- **Multi-tenant SaaS, billing, or public sign-up.** Two deployment targets are in scope — *solo* (local-first desktop) and *internal-shared* (one company, self-hosted via Docker behind its own SSO) — never a hosted, multi-tenant, metered product. Single tenant only.
-- Transmitting user keys to the browser, or storing them in plaintext / in source. (Storage backend varies by target — Keychain for solo, server secrets for shared — see IMPLEMENTATION §9.)
+- **Multi-tenant SaaS, billing, or public sign-up.** The product is **one company-internal app**, self-hosted via Docker behind that company's own SSO — never a hosted, multi-tenant, metered product. Single tenant only. (*Solo* `uvicorn`+`pnpm dev` is the dev loop, not a separate target.)
+- Transmitting user keys to the browser, or committing them to source. (Keys live in a gitignored `.env`, read via `get_secret()`; a hardened backend — Keychain / Vault — is a later swap behind that one helper. See IMPLEMENTATION §9.)
