@@ -1,0 +1,11 @@
+# Root build context (web image). Keep the context small and never ship heavy or
+# host-specific trees into the build.
+.git
+**/node_modules
+data
+server/.venv
+**/__pycache__
+*.pyc
+.pytest_cache
+.ruff_cache
+web/dist

@@ -22,25 +22,41 @@ highlighted, cited results — is complete. See [CHANGELOG.md](CHANGELOG.md) and
 
 ### Run the dev loop
 
+The whole stack runs in Docker — `postgres` + `api` (:8000) + `web` (:5180). No manual
+`uvicorn` / `pnpm dev`:
+
 ```bash
-docker compose up -d postgres                       # datastore (pgvector + pg_search)
-cd server && uv sync && uv run crawl4ai-setup        # deps + Playwright Chromium (once)
-uv run python -m noscia.ingest.run                   # crawl seeds → embed → index
-uv run uvicorn noscia.app:app --reload               # API on :8000
-pnpm install && pnpm dev                             # web on :5180 (proxies /api → :8000)
+docker compose up        # first run builds the api image (torch + Playwright — large)
 ```
 
-First search downloads the embedder (~600 MB) and reranker; models cache under `data/`.
+Open **http://localhost:5180**. Backend source (`server/src`) and frontend source (`web/`)
+are bind-mounted, so edits hot-reload in the containers. Models cache under `data/` (shared
+with the host, so no re-download). Put `OPENROUTER_API_KEY` in a root `.env` (see
+`.env.example`) — compose passes it into `api` for BYOK reasoning; it's never baked into the image.
 
-Phase 2 tooling (from `server/`):
+On a **fresh** database, ingest the seed corpus once:
 
 ```bash
-uv run python -m noscia.train.eval                  # retrieval eval (nDCG@10 / MRR / Recall@10)
-uv run python -m noscia.ingest.run --due            # recrawl only sources past their cadence
-uv sync --group train                               # fine-tune deps (offline only)
-uv run --group train python -m noscia.train.synth                 # BYOK synthetic training pairs
+docker compose exec api uv run python -m noscia.ingest.run    # crawl seeds → embed → index
+```
+
+Phase 2 tooling (inside the api container, or `cd server` on the host):
+
+```bash
+docker compose exec api uv run python -m noscia.train.eval        # eval (nDCG@10 / MRR / Recall@10)
+docker compose exec api uv run python -m noscia.ingest.run --due  # recrawl only sources past cadence
+```
+
+Fine-tuning is offline and host-only (the `train` deps aren't in the image):
+
+```bash
+cd server && uv sync --group train
+uv run --group train python -m noscia.train.synth                        # BYOK synthetic pairs
 uv run --group train python -m noscia.train.finetune --train --compare   # LoRA fine-tune, eval-gated
 ```
+
+> Prefer running natively? The host loop still works: `docker compose up -d postgres`, then
+> `cd server && uv run uvicorn noscia.app:app --reload` and `pnpm dev`.
 
 ## Stack (planned)
 

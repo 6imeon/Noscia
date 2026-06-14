@@ -1,7 +1,9 @@
-# Datastore for the local dev loop AND the company deployment (dev == prod, SPEC §9).
-# ParadeDB = Postgres 17 + pgvector + pg_search in one image.
-# Dev: `docker compose up postgres`. The web/api/embeddings/ingest/proxy services
-# for the company deployment are tracked in IMPLEMENTATION §9.2 — not built yet.
+# Full dev stack — `docker compose up` brings up everything (dev == prod, SPEC §9):
+#   postgres : ParadeDB = Postgres 17 + pgvector + pg_search
+#   api      : FastAPI (uvicorn --reload); source + model cache bind-mounted
+#   web      : Vite dev server (HMR); source bind-mounted, proxies /api → api
+# No manual `pnpm dev` / `uvicorn` needed. First `up` builds the api image (torch +
+# Playwright Chromium — large) and, on a fresh DB, you still ingest once (see README).
 
 services:
   postgres:
@@ -20,6 +22,42 @@ services:
       interval: 5s
       timeout: 3s
       retries: 10
+
+  api:
+    build:
+      context: ./server
+    environment:
+      # Reach Postgres by its compose service name, not localhost.
+      DATABASE_URL: postgresql+psycopg://noscia:noscia@postgres:5432/noscia
+      HF_HOME: /app/data/models
+      # BYOK reasoning key, interpolated from the root .env (never baked into the image).
+      OPENROUTER_API_KEY: ${OPENROUTER_API_KEY:-}
+    volumes:
+      - ./server/src:/app/server/src # live reload of backend source
+      - ./corpus:/app/corpus # seeds + eval set (parents[4]/corpus)
+      - ./db:/app/db # schema DDL (parents[3]/db/init)
+      - ./data:/app/data # model cache + train artifacts (reuses host downloads)
+    ports:
+      - "8000:8000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  web:
+    build:
+      context: . # repo root: the pnpm workspace lockfile lives here
+      dockerfile: web/Dockerfile
+    environment:
+      VITE_PROXY_TARGET: http://api:8000 # proxy /api to the api service
+      VITE_USE_POLLING: "1" # reliable HMR over a macOS bind-mount
+    volumes:
+      - ./web:/repo/web # live reload of frontend source
+      - /repo/web/node_modules # keep the image's installed deps
+      - /repo/node_modules # keep the workspace-root deps
+    ports:
+      - "5180:5180"
+    depends_on:
+      - api
 
 volumes:
   pgdata:

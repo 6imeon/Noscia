@@ -1,0 +1,6 @@
+# Never copy the host (macOS) venv into the Linux image, or any caches.
+.venv
+**/__pycache__
+*.pyc
+.pytest_cache
+.ruff_cache
