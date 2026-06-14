@@ -11,9 +11,13 @@ A vertical, ESG-domain neural search app — Exa-style retrieval over a curated 
 
 ## Status
 
-Phase 1 (core ESG search) complete — crawl → index → hybrid search → rerank →
-highlighted, cited results, end to end. See [CHANGELOG.md](CHANGELOG.md) for what
-landed and [IMPLEMENTATION.md](IMPLEMENTATION.md) §7 for the working tracker.
+Phase 2 (quality + freshness) in progress: an **eval gate** (nDCG@10 / MRR /
+Recall@10 on a held-out ESG set), **incremental crawl** (HTTP 304 + content-hash diff,
+adaptive cadence), and a LoRA **fine-tune pipeline** that runs locally and is honestly
+eval-gated (no ship on the demo corpus — the eval is saturated). Live-search fallback
+deferred. Phase 1 (core ESG search) — crawl → index → hybrid → rerank → highlighted,
+cited results — is complete. See [CHANGELOG.md](CHANGELOG.md) and
+[IMPLEMENTATION.md](IMPLEMENTATION.md) §7.
 
 ### Run the dev loop
 
@@ -26,6 +30,16 @@ pnpm install && pnpm dev                             # web on :5180 (proxies /ap
 ```
 
 First search downloads the embedder (~600 MB) and reranker; models cache under `data/`.
+
+Phase 2 tooling (from `server/`):
+
+```bash
+uv run python -m noscia.train.eval                  # retrieval eval (nDCG@10 / MRR / Recall@10)
+uv run python -m noscia.ingest.run --due            # recrawl only sources past their cadence
+uv sync --group train                               # fine-tune deps (offline only)
+uv run --group train python -m noscia.train.synth                 # BYOK synthetic training pairs
+uv run --group train python -m noscia.train.finetune --train --compare   # LoRA fine-tune, eval-gated
+```
 
 ## Stack (planned)
 

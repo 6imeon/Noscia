@@ -20,13 +20,20 @@ dependencies = [
     "sentence-transformers>=5.5.1",
     "numpy>=2.4.6",
     "pyyaml>=6.0.3",
+    "httpx>=0.28.1",
 ]
 
 [dependency-groups]
 dev = [
     "ruff",
     "pytest",
-    "httpx",
+]
+# Phase 2a fine-tuning only (offline). Kept out of the core deps so the serving
+# path stays lean: install with `uv sync --group train`.
+train = [
+    "datasets",
+    "accelerate",
+    "peft",
 ]
 
 [build-system]

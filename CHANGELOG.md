@@ -4,6 +4,54 @@ All notable changes to Noscia are recorded here. Updated at the **end of each ph
 (see [IMPLEMENTATION.md](IMPLEMENTATION.md) §7). Format loosely follows
 [Keep a Changelog](https://keepachangelog.com/); dates are absolute.
 
+## Phase 2 — Quality + freshness — 2026-06-14
+
+Two halves landed: an **eval gate** for every model change, and **incremental
+freshness** so recrawls are cheap. The fine-tune pipeline is built, runs locally on
+an 18 GB machine, and is **honestly eval-gated** — it does not ship because the demo
+corpus is too small for the eval to show a win (see note). Live-search fallback is
+deferred by decision.
+
+### Eval harness (`server/src/noscia/train/eval.py`)
+- `corpus/eval/esg_queries.jsonl` — 15 held-out ESG queries with **URL-level relevance**
+  grounded in the actually-indexed text (no query sees its own training signal).
+- nDCG@10 / MRR / Recall@10 over a deduped URL ranking; a *retriever* is just
+  `(query, k) → ranked URLs`, so base-vs-fine-tuned compare on the same set/metrics.
+  Built-in retrievers wrap the live Quality + Fast tiers. `--per-query` breakdown.
+- **Honest finding:** on the 8-doc demo corpus retrieval is near-saturated
+  (nDCG@10 ≈ 0.99, MRR/Recall = 1.000) — so per rule 9 no fine-tune can be *justified*
+  here yet. The gate is real even when the corpus makes the result a tie.
+
+### Incremental crawl (`server/src/noscia/ingest/`)
+- **Conditional probe** (`crawl.py::check_conditional`) — a streamed `If-None-Match` /
+  `If-Modified-Since` GET; a `304` skips the browser render entirely (proven live).
+- **Content-hash diff** (`run.py`) — only changed/new chunks are re-embedded, vanished
+  chunks pruned, unchanged chunks left untouched (a recrawl re-embedded **0** of 4).
+  Chunk ids are position-stable (`sha256(url#ordinal)`) so the diff lands in place.
+- **Adaptive cadence** — `corpus.sources_due()` maps each source's cadence (hourly …
+  monthly) to a window; `ingest_due()` / `--due` recrawls only what's stale.
+- `sources` gains `etag` / `last_modified` (idempotent `ALTER … IF NOT EXISTS`).
+
+### Fine-tune pipeline (`server/src/noscia/train/`, `train` dep group)
+- `synth.py` — BYOK LLM (OpenRouter via `get_secret`, never a raw key in source)
+  writes ~3–5 synthetic queries per chunk → `data/train/synth_pairs.jsonl` (gitignored).
+- `finetune.py` — **LoRA** fine-tune of Qwen3-0.6B (MNRL wrapped in MatryoshkaLoss at
+  the deployed 256-dim prefix) + gradient checkpointing + capped batch/seq, so it trains
+  in ~1 min on 18 GB unified memory with **no** MPS watermark override. Then re-runs the
+  ESG eval base-vs-fine-tuned and prints the verdict — **ship only if it wins** (rule 9).
+- This run: fine-tuned ties base (Δ nDCG = +0.000, saturated) → **DO NOT SHIP**, as
+  expected. The adapter verifiably changes the model (cos(base, ft) = 0.988); the tie is
+  real, not a no-op.
+
+### Deferred (decision, not silent skip)
+- **Live-search fallback** (BYOK Exa/Tavily/Firecrawl for out-of-corpus / low-confidence
+  queries) — deferred; revisit later.
+- ColBERT + MUVERA late-interaction path — optional; only if it beats single-vector on eval.
+
+### Pinned versions
+- httpx 0.28.1 (conditional probe + BYOK calls). `train` group (offline,
+  `uv sync --group train`): datasets 5.0.0 · accelerate 1.13.0 · peft 0.19.1.
+
 ## Phase 1 — Core ESG search — 2026-06-14
 
 The crawl → index → search pipeline is live end to end. An ESG question returns

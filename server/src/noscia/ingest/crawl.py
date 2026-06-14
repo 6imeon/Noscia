@@ -3,11 +3,23 @@
 Headless Chromium (Playwright) renders each seed; crawl4ai emits pruned markdown.
 One page at a time with per-URL error capture so one dead seed never sinks a run.
 Run ``crawl4ai-setup`` once to install the browser (IMPLEMENTATION §3).
+
+Phase 2 freshness adds a cheap **conditional pre-check** (``check_conditional``): a
+streamed HTTP GET that echoes the stored ``ETag`` / ``Last-Modified`` back as
+``If-None-Match`` / ``If-Modified-Since``. A ``304 Not Modified`` short-circuits the
+whole expensive browser render. When the server doesn't honor validators we fall
+through to a full crawl and the content-hash diff catches the no-op anyway.
 """
 
 from __future__ import annotations
 
 from dataclasses import dataclass
+
+# A real UA — some hosts 403 the default httpx agent (and skip validators for it).
+_UA = (
+    "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 "
+    "(KHTML, like Gecko) Chrome/124.0 Safari/537.36 Noscia/0.1 (ESG corpus crawler)"
+)
 
 
 @dataclass
@@ -17,6 +29,48 @@ class CrawledPage:
     markdown: str
     ok: bool = True
     error: str | None = None
+
+
+@dataclass
+class Conditional:
+    """Result of the cheap validator probe before a full crawl."""
+
+    not_modified: bool = False  # server returned 304 → skip the browser render
+    etag: str | None = None  # fresh validators to persist for next time
+    last_modified: str | None = None
+    error: str | None = None  # probe failed → caller should fall through to crawl
+
+
+async def check_conditional(
+    url: str, etag: str | None, last_modified: str | None, timeout_s: float = 15.0
+) -> Conditional:
+    """Streamed conditional GET. 304 ⇒ not_modified; else capture fresh validators.
+
+    Streamed so a ``200`` doesn't pull the body (the browser re-fetches anyway); a
+    ``304`` carries no body. Any failure returns ``error`` set so the caller crawls
+    rather than wrongly skipping a possibly-changed page.
+    """
+    import httpx
+
+    headers = {"User-Agent": _UA}
+    if etag:
+        headers["If-None-Match"] = etag
+    if last_modified:
+        headers["If-Modified-Since"] = last_modified
+    try:
+        async with httpx.AsyncClient(follow_redirects=True, timeout=timeout_s) as client:
+            req = client.build_request("GET", url, headers=headers)
+            resp = await client.send(req, stream=True)
+            await resp.aclose()  # headers + status only; never download the body
+        if resp.status_code == 304:
+            return Conditional(not_modified=True, etag=etag, last_modified=last_modified)
+        return Conditional(
+            not_modified=False,
+            etag=resp.headers.get("ETag"),
+            last_modified=resp.headers.get("Last-Modified"),
+        )
+    except Exception as exc:  # never let a probe failure mask a real change
+        return Conditional(error=f"{type(exc).__name__}: {exc}")
 
 
 def _extract_markdown(result) -> str:

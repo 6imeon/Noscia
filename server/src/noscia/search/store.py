@@ -100,6 +100,14 @@ class VectorStore(ABC):
         """Drop all chunks for a page (clean re-ingest); return rows removed."""
 
     @abstractmethod
+    def delete_ids(self, ids: list[str]) -> int:
+        """Drop specific chunks by id (incremental crawl: prune vanished chunks)."""
+
+    @abstractmethod
+    def existing_hashes(self, url: str) -> dict[str, str]:
+        """``{chunk_id: content_hash}`` for a page — the diff base for incremental crawl."""
+
+    @abstractmethod
     def count(self) -> int:
         """Total indexed chunks (Corpus view stat / rail counter)."""
 
@@ -225,6 +233,22 @@ class PgVectorStore(VectorStore):
         with self._engine.begin() as conn:
             res = conn.execute(text("DELETE FROM chunks WHERE url = :url"), {"url": url})
             return res.rowcount or 0
+
+    def delete_ids(self, ids: list[str]) -> int:
+        if not ids:
+            return 0
+        with self._engine.begin() as conn:
+            res = conn.execute(
+                text("DELETE FROM chunks WHERE id = ANY(:ids)"), {"ids": ids}
+            )
+            return res.rowcount or 0
+
+    def existing_hashes(self, url: str) -> dict[str, str]:
+        with self._engine.connect() as conn:
+            rows = conn.execute(
+                text("SELECT id, content_hash FROM chunks WHERE url = :url"), {"url": url}
+            ).all()
+        return {r.id: r.content_hash for r in rows}
 
     def count(self) -> int:
         with self._engine.connect() as conn:

@@ -181,15 +181,21 @@ Build Phase 1 thin and end-to-end first (a handful of seed URLs, one query, visi
 - [x] **DoD:** an ESG question returns relevant, highlighted, cited results from the local index in quality tier ✓ (verified end-to-end through the Vite proxy)
 
 ### Phase 2 — Quality + freshness
-- [ ] `corpus/eval/esg_queries.jsonl` held-out eval set authored
-- [ ] `train/synth.py` — BYOK LLM generates ~3–5 synthetic queries per chunk
-- [ ] `train/finetune.py` — fine-tune Qwen3-0.6B on the synthetic pairs
-- [ ] `train/eval.py` — nDCG@10 / MRR, fine-tuned vs base; **ship only if it wins**
-- [ ] Incremental crawl: sitemap `lastmod` + `ETag`/`If-Modified-Since` (304 short-circuit) + `content_hash` diff
-- [ ] Adaptive recrawl cadence per source (news hourly … frameworks monthly); upsert deltas only; delete dead URLs
-- [ ] Live-search fallback (BYOK Exa/Tavily/Firecrawl) when index confidence low / query out-of-corpus; merged + labeled live-vs-indexed
+- [x] `corpus/eval/esg_queries.jsonl` held-out eval set authored (15 queries, URL-level relevance grounded in indexed text)
+- [x] `train/synth.py` — BYOK LLM (OpenRouter via `get_secret`) generates ~3–5 synthetic queries per chunk
+- [x] `train/finetune.py` — **LoRA** fine-tune Qwen3-0.6B on the synthetic pairs (MNRL + Matryoshka@256, gradient checkpointing → fits 18 GB), gated on eval
+- [x] `train/eval.py` — nDCG@10 / MRR / Recall@10, fine-tuned vs base; **ship only if it wins** (rule 9)
+- [x] Incremental crawl: `ETag`/`If-Modified-Since` (304 short-circuit) + `content_hash` diff (re-embed only changed chunks)
+- [x] Adaptive recrawl cadence per source (`sources_due()` / `--due`); upsert deltas only; delete vanished chunks
+- [ ] Live-search fallback (BYOK Exa/Tavily/Firecrawl) when index confidence low / query out-of-corpus — **deferred** (decision: revisit later)
 - [ ] *(Optional)* ColBERT + MUVERA late-interaction path behind an opt-in toggle — only if it beats fine-tuned single-vector on eval
-- [ ] **DoD:** fine-tuned beats base on eval; recrawl re-embeds only changed chunks; out-of-corpus queries fall back to live
+- [ ] **DoD:** recrawl re-embeds only changed chunks ✓; fine-tune pipeline runs + is eval-gated ✓ (eval saturated on the 8-doc demo corpus — see note); live fallback deferred
+
+> **Eval-saturation note.** On the current 8-doc demo corpus, URL-level retrieval is
+> already near-perfect (nDCG@10 ≈ 0.99, MRR/Recall = 1.000), so a fine-tuned embedder
+> cannot demonstrate a win — per rule 9 it does **not** ship until the corpus grows
+> enough for the eval to discriminate. The full synth → fine-tune → compare pipeline is
+> built and runs; the gate is honest, not the result.
 
 ### Phase 3 — ESG entity search (showpiece)
 - [ ] `agent/schema.py` — declarative company entity schema (SPEC §9), every field nullable + evidence link

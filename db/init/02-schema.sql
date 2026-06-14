@@ -5,7 +5,7 @@
 
 -- chunks: the search corpus. One row per ~512-token passage.
 CREATE TABLE IF NOT EXISTS chunks (
-    id            TEXT PRIMARY KEY,                 -- content-addressed: sha256(url|ordinal|content_hash)
+    id            TEXT PRIMARY KEY,                 -- position-stable: sha256(url#ordinal), so a recrawl diffs content_hash in place
     url           TEXT        NOT NULL,
     title         TEXT        NOT NULL DEFAULT '',
     org           TEXT,
@@ -38,5 +38,13 @@ CREATE TABLE IF NOT EXISTS sources (
     pages        INTEGER     NOT NULL DEFAULT 0,
     chunks       INTEGER     NOT NULL DEFAULT 0,
     last_crawl   TIMESTAMPTZ,
-    error        TEXT
+    error        TEXT,
+    -- Phase 2 incremental crawl: HTTP validators echoed back as If-None-Match /
+    -- If-Modified-Since so an unchanged page short-circuits with a 304 (no re-crawl).
+    etag          TEXT,
+    last_modified TEXT
 );
+
+-- Phase 2 columns are added to pre-existing `sources` tables too (idempotent).
+ALTER TABLE sources ADD COLUMN IF NOT EXISTS etag          TEXT;
+ALTER TABLE sources ADD COLUMN IF NOT EXISTS last_modified TEXT;

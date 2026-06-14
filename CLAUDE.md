@@ -49,6 +49,9 @@ A company-internal, vertical **ESG neural-search** web app: Exa-style retrieval 
 | numpy | 2.4.6 | vector math (Matryoshka truncate/renormalize) |
 | tiktoken | 0.13.0 | token-accurate chunking (transitive via crawl4ai) |
 | pyyaml | 6.0.3 | parses `corpus/seeds.esg.yaml` |
+| httpx | 0.28.1 | Phase 2 conditional crawl probe + BYOK OpenRouter synth calls |
+| datasets | 5.0.0 | `train` group (fine-tune dataset); offline only — `uv sync --group train` |
+| accelerate | 1.13.0 | `train` group (sentence-transformers trainer backend) |
 | Qwen3-Embedding-0.6B | — | model; 1024-dim → Matryoshka 256; eval before swapping |
 | bge-reranker-v2-m3 | — | model; eval vs Qwen3-Reranker-0.6B |
 
