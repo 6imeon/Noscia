@@ -124,7 +124,7 @@ Phase 0  skeleton + contract + .env + Postgres up
 Phase 1  ingest(crawl→chunk→embed→Postgres) → hybrid search → rerank → highlights → UI
    │        (pgvector dense + pg_search BM25, fused with RRF in SQL/app)
    ├── Phase 2a  fine-tune embedder on synthetic ESG pairs (eval-gated)
-   ├── Phase 2b  incremental crawl (ETag/lastmod/content_hash) + live-search fallback
+   ├── Phase 2b  incremental crawl (ETag/lastmod/content_hash)   [no third-party live fallback — see rule 13]
    ├── Phase 2c  OPTIONAL ColBERT+MUVERA quality mode (only if eval says it earns its place)
    │
 Phase 3  agentic entity search (decompose→retrieve→extract→loop→merge→cited table→CSV)
@@ -187,9 +187,9 @@ Build Phase 1 thin and end-to-end first (a handful of seed URLs, one query, visi
 - [x] `train/eval.py` — nDCG@10 / MRR / Recall@10, fine-tuned vs base; **ship only if it wins** (rule 9)
 - [x] Incremental crawl: `ETag`/`If-Modified-Since` (304 short-circuit) + `content_hash` diff (re-embed only changed chunks)
 - [x] Adaptive recrawl cadence per source (`sources_due()` / `--due`); upsert deltas only; delete vanished chunks
-- [ ] Live-search fallback (BYOK Exa/Tavily/Firecrawl) when index confidence low / query out-of-corpus — **deferred** (decision: revisit later)
+- [x] ~~Live-search fallback (BYOK Exa/Tavily/Firecrawl)~~ — **dropped** (rule 13: no third-party search providers / no external data egress). Freshness is index-only via incremental crawl.
 - [ ] *(Optional)* ColBERT + MUVERA late-interaction path behind an opt-in toggle — only if it beats fine-tuned single-vector on eval
-- [ ] **DoD:** recrawl re-embeds only changed chunks ✓; fine-tune pipeline runs + is eval-gated ✓ (eval saturated on the 8-doc demo corpus — see note); live fallback deferred
+- [ ] **DoD:** recrawl re-embeds only changed chunks ✓; fine-tune pipeline runs + is eval-gated ✓ (eval saturated on the 8-doc demo corpus — see note); no live fallback (by decision)
 
 > **Eval-saturation note.** On the current 8-doc demo corpus, URL-level retrieval is
 > already near-perfect (nDCG@10 ≈ 0.99, MRR/Recall = 1.000), so a fine-tuned embedder
@@ -200,7 +200,7 @@ Build Phase 1 thin and end-to-end first (a handful of seed URLs, one query, visi
 ### Phase 3 — ESG entity search (showpiece)
 - [ ] `agent/schema.py` — declarative company entity schema (SPEC §9), every field nullable + evidence link
 - [ ] **Decompose:** LLM → extraction schema + subqueries (optional hypothetical-answer retrieval prior)
-- [ ] **Retrieve:** each subquery through the Phase 1 hybrid pipeline (+ live fallback)
+- [ ] **Retrieve:** each subquery through the Phase 1 hybrid pipeline (index-only; no live fallback — rule 13)
 - [ ] **Extract:** `agent/extract.py` fills schema per entity, **explicit-evidence-only**; capture `surface_forms` + `aliases`
 - [ ] **Loop:** detect gaps, issue follow-up queries until saturation or step-budget hit
 - [ ] **Merge:** dedupe entities via aliases/surface forms

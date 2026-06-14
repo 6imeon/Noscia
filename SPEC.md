@@ -19,7 +19,7 @@ The whole point is **vertical, not web-scale**. We are not competing with Google
 ### Why these choices (carry this context forward)
 - A single general embedding model is the real moat for a web-scale engine. We sidestep it by going vertical and fine-tuning a small open model on synthetic ESG query/doc pairs. On a narrow corpus this beats a frontier general model.
 - Late-interaction (ColBERT) retrieval beats single-vector, especially out-of-domain; MUVERA reduces multi-vector search to single-vector MIPS so we get most of that quality at single-vector speed. Optional Phase 2 quality mode, not a Phase 1 requirement.
-- Freshness is solved by incremental delta-indexing (change detection + upsert), not periodic full re-crawls, plus a live-search API fallback for the long tail we don't index.
+- Freshness is solved by incremental delta-indexing (change detection + upsert), not periodic full re-crawls. The long tail we don't index is handled by widening the corpus (adding seeds), **not** by calling a third-party search API (rule 13: no external data egress).
 - Entity search ("find every company that…") is an agentic recursive retrieve-extract loop, not a better ranker.
 
 ---
@@ -187,13 +187,13 @@ Adapters: `anthropic`, `openai`, `openrouter`, `ollama`. Default reasoning model
 - **Fine-tune:** `train/synth.py` uses a BYOK LLM to generate ~3–5 synthetic queries per chunk; `train/finetune.py` fine-tunes Qwen3-0.6B on those pairs; `train/eval.py` reports nDCG@10 / MRR on `corpus/eval/esg_queries.jsonl` vs the base model. Ship the fine-tuned model if it wins.
 - **ColBERT + MUVERA (optional quality mode):** add a late-interaction path with MUVERA fixed-dimensional encodings so multi-vector retrieval collapses to a single pgvector column — no second store. Opt-in toggle. (If multi-vector ever becomes the primary ranker, that's the point to weigh a dedicated Qdrant with native multivectors.)
 - **Incremental crawl:** sitemap `lastmod` + HTTP `ETag`/`If-Modified-Since` (304 short-circuit) + `content_hash` diffing + adaptive recrawl cadence per source (news hourly, frameworks monthly). Upsert deltas only.
-- **Live-search fallback:** when index confidence is low or the query is clearly outside the corpus, call a BYOK agentic search API (Exa / Tavily / Firecrawl) and merge results, clearly labeled as live vs indexed.
-- **DoD:** fine-tuned model beats base on the eval set; recrawl re-embeds only changed chunks; out-of-corpus queries gracefully fall back to live search.
+- **No live-search fallback.** ~~Call a BYOK agentic search API (Exa / Tavily / Firecrawl) for the long tail.~~ **Dropped by decision (rule 13): no third-party search providers, no external data egress.** When index confidence is low or a query is out-of-corpus, Noscia says so (low-confidence / empty state) and the corpus is widened by adding seeds — search never leaves our own index.
+- **DoD:** fine-tuned model beats base on the eval set; recrawl re-embeds only changed chunks; out-of-corpus queries return an honest low-confidence/empty state (no external call).
 
 ### Phase 3 — ESG entity search (the showpiece; addresses caveat 3)
 Agentic recursive retrieve-extract loop producing a cited, structured table.
 1. **Decompose:** LLM turns the entity query into an extraction schema (§9) + a set of subqueries. Optionally generate an "expected-response sketch" (hypothetical answer) to use as a retrieval prior.
-2. **Retrieve:** run each subquery through the Phase 1 hybrid pipeline (and live fallback).
+2. **Retrieve:** run each subquery through the Phase 1 hybrid pipeline (index-only; no live fallback — rule 13).
 3. **Extract:** LLM fills the schema per candidate entity, **explicit-evidence-only** (no field without a supporting passage); capture `surface_forms` and `aliases`.
 4. **Loop:** detect gaps, issue follow-up queries conditioned on what's been found, until the result set saturates or a step budget is hit.
 5. **Merge:** dedupe entities via aliases/surface forms.
@@ -213,7 +213,7 @@ Curated, not web-scale. Group by `source_type` with a recrawl cadence. Example c
 - **Regulators / bodies:** relevant EU, UK, and US disclosure bodies' public pages.
 - **Ratings / data:** MSCI ESG, Sustainalytics, S&P Global ESG methodology pages (methodology/explainer pages, not paywalled scores).
 - **Company disclosures:** a fixed demo set of public company sustainability/annual reports (e.g. a slice of FTSE 100 issuers).
-- **News / NGO:** a small set of reputable ESG news and NGO sources for the freshness/live-fallback demo.
+- **News / NGO:** a small set of reputable ESG news and NGO sources for the freshness (incremental-recrawl) demo.
 
 Keep the demo corpus to a few thousand pages — enough to be convincing, small enough to crawl and fine-tune locally.
 
@@ -246,7 +246,7 @@ Make the schema declarative so other entity types (funds, sectors) can be added 
 
 1. **Plain neural search:** *"What is the difference between Scope 2 and Scope 3 emissions?"* → highlighted passages from framework sources, with citations.
 2. **Semantic over keyword:** a conceptual query that keyword search would miss (e.g. *"companies walking back climate commitments"*) → relevant results by meaning.
-3. **Freshness fallback:** an event-recent query that isn't in the index → live-search results merged in, labeled.
+3. **Freshness via recrawl:** a recently-changed source is re-indexed incrementally (304 / content-hash diff) so the updated passage surfaces; an out-of-corpus query returns an honest low-confidence/empty state, not a third-party call.
 4. **Entity search (showpiece):** *"Find FTSE 100 companies with a 2030 net-zero target and an SBTi-validated pathway, with any recent controversy"* → a populated, deduped, fully-cited table; export to CSV.
 
 ---

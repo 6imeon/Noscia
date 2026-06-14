@@ -9,8 +9,8 @@ All notable changes to Noscia are recorded here. Updated at the **end of each ph
 Two halves landed: an **eval gate** for every model change, and **incremental
 freshness** so recrawls are cheap. The fine-tune pipeline is built, runs locally on
 an 18 GB machine, and is **honestly eval-gated** — it does not ship because the demo
-corpus is too small for the eval to show a win (see note). Live-search fallback is
-deferred by decision.
+corpus is too small for the eval to show a win (see note). Search stays **index-only**:
+no third-party search providers, no external data egress (rule 13).
 
 ### Eval harness (`server/src/noscia/train/eval.py`)
 - `corpus/eval/esg_queries.jsonl` — 15 held-out ESG queries with **URL-level relevance**
@@ -43,9 +43,10 @@ deferred by decision.
   expected. The adapter verifiably changes the model (cos(base, ft) = 0.988); the tie is
   real, not a no-op.
 
-### Deferred (decision, not silent skip)
-- **Live-search fallback** (BYOK Exa/Tavily/Firecrawl for out-of-corpus / low-confidence
-  queries) — deferred; revisit later.
+### Dropped / optional
+- **Live-search fallback** (BYOK Exa/Tavily/Firecrawl) — **dropped by decision (rule 13):**
+  no third-party search providers, no external data egress. Out-of-corpus queries return an
+  honest low-confidence/empty state; the corpus is widened by adding seeds instead.
 - ColBERT + MUVERA late-interaction path — optional; only if it beats single-vector on eval.
 
 ### Pinned versions

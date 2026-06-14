@@ -14,9 +14,10 @@ A vertical, ESG-domain neural search app — Exa-style retrieval over a curated 
 Phase 2 (quality + freshness) in progress: an **eval gate** (nDCG@10 / MRR /
 Recall@10 on a held-out ESG set), **incremental crawl** (HTTP 304 + content-hash diff,
 adaptive cadence), and a LoRA **fine-tune pipeline** that runs locally and is honestly
-eval-gated (no ship on the demo corpus — the eval is saturated). Live-search fallback
-deferred. Phase 1 (core ESG search) — crawl → index → hybrid → rerank → highlighted,
-cited results — is complete. See [CHANGELOG.md](CHANGELOG.md) and
+eval-gated (no ship on the demo corpus — the eval is saturated). Search is **index-only**:
+no third-party search providers, no external data egress (freshness comes from incremental
+recrawl, not a live API). Phase 1 (core ESG search) — crawl → index → hybrid → rerank →
+highlighted, cited results — is complete. See [CHANGELOG.md](CHANGELOG.md) and
 [IMPLEMENTATION.md](IMPLEMENTATION.md) §7.
 
 ### Run the dev loop

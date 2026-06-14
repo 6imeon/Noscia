@@ -22,6 +22,7 @@ A company-internal, vertical **ESG neural-search** web app: Exa-style retrieval 
 10. **Swappable seams from Phase 0:** `VectorStore` (→ `PgVectorStore`), `get_secret()`, `CurrentUser` (`SoloUser` | `HeaderUser`). App code talks to these, not to raw SQL / env / a hardcoded user.
 11. **Keep the corpus small and the domain narrow.** Vertical quality, not coverage. Resist "search the whole web."
 12. **Changelog, not README, holds the change history.** Record what landed in `CHANGELOG.md` and update it at the **end of each phase**. README stays lean (overview + usage); it never accumulates a change narrative.
+13. **Index-only search — no third-party search providers, no external data egress.** Search results come **only** from our own index; never call an external search/crawl API (Exa/Tavily/Firecrawl/etc.) at query time. Out-of-corpus / low-confidence queries return an honest low-confidence or empty state — widen the corpus by adding seeds, never by querying a third party. (BYOK reasoning LLMs for entity-search/synth are a separate, explicit user-keyed path; this rule is about not sending queries/data to outside *search* services.)
 
 ## Pinned versions (fill as deps are added — rule: pin exact, record here)
 | Tool / lib | Version | Notes |
