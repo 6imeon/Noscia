@@ -14,10 +14,11 @@ from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 from importlib.metadata import version as pkg_version
 
-from fastapi import FastAPI
+from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 
 from . import corpus, db
+from . import user as user_mod
 from .config import get_secret, mask
 from .contract import (
     AddSeedRequest,
@@ -25,12 +26,17 @@ from .contract import (
     CorpusSource,
     CorpusStats,
     HealthResponse,
+    IndustriesResponse,
+    Industry,
     IngestRequest,
     IngestResponse,
     ProviderKeyStatus,
     ProvidersResponse,
+    RemoveSeedRequest,
+    RemoveSeedResponse,
     SearchRequest,
     SearchResponse,
+    SelectIndustryRequest,
     StructuredRequest,
     StructuredResponse,
     Tier,
@@ -99,27 +105,29 @@ def health() -> HealthResponse:
     return HealthResponse(status="ok" if db_ok else "degraded", db=db_ok, version=VERSION)
 
 
-# A tiny in-process cache of the last few retrievals, keyed by (query, tier). The
-# Structured tab fires right after a search with the same query, so this lets it reuse
+# A tiny in-process cache of the last few retrievals, keyed by (industry, query, tier).
+# The Structured tab fires right after a search with the same query, so this lets it reuse
 # the retrieval instead of re-running the whole embed+rerank pipeline (the ~1 min the
-# user saw). Snapshots are answer-free deep copies, so a cached entry never leaks a stale
+# user saw). The industry is part of the key so two verticals' identical queries never
+# collide. Snapshots are answer-free deep copies, so a cached entry never leaks a stale
 # synthesized answer. dev == prod single process, so a module-level cache is enough.
-_SEARCH_CACHE: OrderedDict[tuple[str, str], SearchResponse] = OrderedDict()
+_SEARCH_CACHE: OrderedDict[tuple[str, str, str], SearchResponse] = OrderedDict()
 _SEARCH_CACHE_MAX = 32
 
 
-def _remember(resp: SearchResponse) -> None:
-    key = (resp.query, resp.tier)
+def _remember(industry: str, resp: SearchResponse) -> None:
+    key = (industry, resp.query, resp.tier)
     _SEARCH_CACHE[key] = resp.model_copy(deep=True)
     _SEARCH_CACHE.move_to_end(key)
     while len(_SEARCH_CACHE) > _SEARCH_CACHE_MAX:
         _SEARCH_CACHE.popitem(last=False)
 
 
-def _recall(query: str, tier: Tier) -> SearchResponse | None:
-    hit = _SEARCH_CACHE.get((query, tier))
+def _recall(industry: str, query: str, tier: Tier) -> SearchResponse | None:
+    key = (industry, query, tier)
+    hit = _SEARCH_CACHE.get(key)
     if hit is not None:
-        _SEARCH_CACHE.move_to_end((query, tier))
+        _SEARCH_CACHE.move_to_end(key)
     return hit
 
 
@@ -127,7 +135,8 @@ def _recall(query: str, tier: Tier) -> SearchResponse | None:
 async def search(req: SearchRequest) -> SearchResponse:
     # embed → (hybrid+rerank | dense) → highlight. See search/pipeline.py.
     resp = run_search(req)
-    _remember(resp)  # answer-free snapshot for a follow-up /structured on the same query
+    # answer-free snapshot for a follow-up /structured on the same query+vertical
+    _remember(req.industry, resp)
     if req.summarize:
         resp = await _attach_answer(req.query, resp)
     return resp
@@ -169,9 +178,11 @@ async def structured(req: StructuredRequest) -> StructuredResponse:
     the client last searched."""
     from .search import structured as st
 
-    # Reuse the just-run retrieval when the query matches (the common case — Structured
-    # fires right after a search), else run it. Avoids paying for embed+rerank twice.
-    resp = _recall(req.query, req.tier) or run_search(SearchRequest(query=req.query, tier=req.tier))
+    # Reuse the just-run retrieval when the query+vertical match (the common case —
+    # Structured fires right after a search), else run it. Avoids embed+rerank twice.
+    resp = _recall(req.industry, req.query, req.tier) or run_search(
+        SearchRequest(query=req.query, tier=req.tier, industry=req.industry)
+    )
     passages = [_passage_text(r.highlight) for r in resp.results[: st.DEFAULT_TOP_N]]
     auto = not req.fields
     fields = (
@@ -190,22 +201,24 @@ async def structured(req: StructuredRequest) -> StructuredResponse:
 
 
 @app.get("/corpus", response_model=CorpusResponse)
-def corpus_state() -> CorpusResponse:
+def corpus_state(industry: str = "esg") -> CorpusResponse:
+    # Scoped to the active vertical so the Corpus view never mixes verticals.
     return CorpusResponse(
-        stats=CorpusStats(**corpus.stats()),
-        sources=[CorpusSource(**s) for s in corpus.list_sources()],
+        stats=CorpusStats(**corpus.stats(industry)),
+        sources=[CorpusSource(**s) for s in corpus.list_sources(industry)],
+        industry=industry,
     )
 
 
 @app.post("/corpus/ingest", response_model=IngestResponse)
 async def corpus_ingest(req: IngestRequest) -> IngestResponse:
-    seeds = ingest.register_seeds()
+    seeds = ingest.register_seeds(req.industry)
     if req.urls:
         wanted = set(req.urls)
         specs = [s for s in seeds if s["url"] in wanted]
     else:
         specs = seeds
-    summary = await ingest.ingest_specs(specs)
+    summary = await ingest.ingest_specs(specs, industry=req.industry)
     return IngestResponse(
         ok=summary["ok"],
         indexed_pages=summary["indexed_pages"],
@@ -216,15 +229,60 @@ async def corpus_ingest(req: IngestRequest) -> IngestResponse:
 
 @app.post("/corpus/add", response_model=IngestResponse)
 async def corpus_add(req: AddSeedRequest) -> IngestResponse:
-    corpus.upsert_source(req.url, req.source_type, req.org, req.cadence)
+    corpus.upsert_source(req.url, req.source_type, req.org, req.cadence, req.industry)
     spec = {"url": req.url, "source_type": req.source_type, "org": req.org, "cadence": req.cadence}
-    summary = await ingest.ingest_specs([spec])
+    summary = await ingest.ingest_specs([spec], industry=req.industry)
     return IngestResponse(
         ok=summary["ok"],
         indexed_pages=summary["indexed_pages"],
         chunks=summary["chunks"],
         errors=[f"{e['url']}: {e['error']}" for e in summary["errors"]],
     )
+
+
+@app.post("/corpus/remove", response_model=RemoveSeedResponse)
+def corpus_remove(req: RemoveSeedRequest) -> RemoveSeedResponse:
+    """Remove a seed and all the chunks it produced from a vertical (industry-scoped).
+    The client confirms the chunk count first — removal throws away crawl+embed work that
+    re-adding re-pays (MULTI_INDUSTRY.md §5.7)."""
+    removed = corpus.delete_source(req.url, req.industry)
+    return RemoveSeedResponse(ok=True, removed_chunks=removed)
+
+
+def _industries_for(user: user_mod.User) -> IndustriesResponse:
+    """Catalog (corpus/industries.yaml) ⨯ this user's state: each entry marked `loaded`
+    (crawled) and `active` (the user's current pick). The shared body of both endpoints."""
+    active = user_mod.get_active_industry(user)
+    loaded = corpus.industries_loaded()
+    items = [
+        Industry(
+            id=c["id"],
+            label=c["label"],
+            blurb=c.get("blurb", ""),
+            icon=c.get("icon", ""),
+            active=(c["id"] == active),
+            loaded=(c["id"] in loaded),
+        )
+        for c in ingest.load_industries()
+    ]
+    return IndustriesResponse(industries=items, active=active)
+
+
+@app.get("/industries", response_model=IndustriesResponse)
+def industries_list(request: Request) -> IndustriesResponse:
+    """The setup menu / switcher source: the catalog plus which vertical is loaded/active."""
+    return _industries_for(user_mod.current_user(request))
+
+
+@app.post("/industries/select", response_model=IndustriesResponse)
+def industries_select(req: SelectIndustryRequest, request: Request) -> IndustriesResponse:
+    """Set the caller's active vertical, then return the refreshed catalog. The client kicks
+    off ingest when the chosen vertical isn't yet `loaded` (MULTI_INDUSTRY.md §5.5)."""
+    if req.id not in {c["id"] for c in ingest.load_industries()}:
+        raise HTTPException(status_code=404, detail=f"unknown industry '{req.id}'")
+    user = user_mod.current_user(request)
+    user_mod.set_active_industry(user, req.id)
+    return _industries_for(user)
 
 
 @app.get("/providers", response_model=ProvidersResponse)

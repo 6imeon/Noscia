@@ -15,6 +15,7 @@ CREATE TABLE IF NOT EXISTS chunks (
     content_hash  TEXT        NOT NULL,             -- sha256 of normalized text (Phase 2 incremental crawl)
     token_count   INTEGER,
     dense         vector(256) NOT NULL,             -- Qwen3 → Matryoshka 256, L2-normalized
+    industry      TEXT        NOT NULL DEFAULT 'esg', -- the vertical this chunk belongs to; every retrieval filters WHERE industry = :active (MULTI_INDUSTRY.md §5.1)
     crawled_at    TIMESTAMPTZ NOT NULL DEFAULT now(),
     published_at  TIMESTAMPTZ                        -- when the *document* was published (NULL = unknown); ≠ crawled_at. Evidence-or-null: only set when a date is found in page/PDF metadata
 );
@@ -27,6 +28,13 @@ ALTER TABLE chunks ADD COLUMN IF NOT EXISTS source_url TEXT;
 -- metadata at ingest. Nullable — a missing date never penalizes (the news-weighted
 -- recency prior treats un-dated chunks as a no-op). Added to pre-existing tables too.
 ALTER TABLE chunks ADD COLUMN IF NOT EXISTS published_at TIMESTAMPTZ;
+
+-- Multi-industry (MULTI_INDUSTRY.md): the vertical a chunk belongs to. DEFAULT 'esg'
+-- backfills every pre-existing row in place (no data move) — the migration *is* the
+-- default. Every retrieval CTE filters `WHERE industry = :industry`; the btree index
+-- keeps that filter cheap and is the seam the partitioning upgrade (§5.1) builds on.
+ALTER TABLE chunks ADD COLUMN IF NOT EXISTS industry TEXT NOT NULL DEFAULT 'esg';
+CREATE INDEX IF NOT EXISTS chunks_industry_idx ON chunks (industry);
 
 -- Dense ANN: HNSW over cosine distance (pgvector). `<=>` is cosine distance.
 CREATE INDEX IF NOT EXISTS chunks_dense_hnsw
@@ -45,6 +53,7 @@ CREATE TABLE IF NOT EXISTS sources (
     url          TEXT PRIMARY KEY,
     source_type  TEXT        NOT NULL,
     org          TEXT,
+    industry     TEXT        NOT NULL DEFAULT 'esg',  -- the vertical this seed feeds; scopes the Corpus view and crawls
     cadence      TEXT        NOT NULL DEFAULT 'monthly',
     status       TEXT        NOT NULL DEFAULT 'idle',   -- idle | crawling | done | error
     pages        INTEGER     NOT NULL DEFAULT 0,
@@ -60,3 +69,17 @@ CREATE TABLE IF NOT EXISTS sources (
 -- Phase 2 columns are added to pre-existing `sources` tables too (idempotent).
 ALTER TABLE sources ADD COLUMN IF NOT EXISTS etag          TEXT;
 ALTER TABLE sources ADD COLUMN IF NOT EXISTS last_modified TEXT;
+
+-- Multi-industry: tag each seed with its vertical (DEFAULT 'esg' backfills in place).
+ALTER TABLE sources ADD COLUMN IF NOT EXISTS industry TEXT NOT NULL DEFAULT 'esg';
+CREATE INDEX IF NOT EXISTS sources_industry_idx ON sources (industry);
+
+-- user_prefs: per-user product state (MULTI_INDUSTRY.md §5.4). Today just the active
+-- vertical — "loaded one at a time" is this row, not a physical data swap. Keyed by
+-- User.id (SoloUser → 'solo'); when SSO lands the key becomes the SSO user with no
+-- call-site change (same seam as user.py::current_user).
+CREATE TABLE IF NOT EXISTS user_prefs (
+    user_id          TEXT PRIMARY KEY,
+    active_industry  TEXT        NOT NULL,
+    updated_at       TIMESTAMPTZ NOT NULL DEFAULT now()
+);

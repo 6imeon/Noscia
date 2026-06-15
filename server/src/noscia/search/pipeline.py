@@ -53,7 +53,7 @@ def run_search(req: SearchRequest) -> SearchResponse:
     qvec = embed_query(req.query)
 
     if req.tier == "fast":
-        fused: Fused = get_store().dense_search(qvec, req.top_k)
+        fused: Fused = get_store().dense_search(qvec, req.top_k, req.industry)
         # News-weighted recency prior, applied last so it nudges the final order (a no-op
         # for every non-news / un-dated hit). Mirrored in the eval retrievers (rule 9).
         hits = apply_recency_prior(fused.hits)
@@ -61,7 +61,7 @@ def run_search(req: SearchRequest) -> SearchResponse:
             dense=fused.dense_n, bm25=0, fused=len(hits), reranked=0
         )
     else:  # quality
-        fused = get_store().hybrid_search(req.query, qvec, RERANK_CANDIDATES)
+        fused = get_store().hybrid_search(req.query, qvec, RERANK_CANDIDATES, req.industry)
         reranked = rerank_mod.rerank(req.query, fused.hits, req.top_k)
         hits = apply_recency_prior(reranked)  # recency nudges the reranked order
         trace = PipelineTrace(

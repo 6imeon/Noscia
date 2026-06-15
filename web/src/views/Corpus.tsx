@@ -10,6 +10,7 @@ import {
   type SourceStatus,
   type SourceType,
 } from '../lib/api'
+import { useIndustry } from '../app/industry'
 import { SourceDot } from '../components/SourceType'
 
 const SOURCE_TYPES: SourceType[] = ['framework', 'regulator', 'ratings', 'report', 'ngo', 'news']
@@ -32,23 +33,24 @@ function bytes(n: number): string {
 }
 
 export function Corpus() {
+  const { activeIndustry, industries } = useIndustry()
   const [load, setLoad] = useState<Load>({ kind: 'loading' })
   const [busy, setBusy] = useState<Set<string>>(new Set())
 
   const refresh = useCallback(async () => {
     try {
-      const data = await api.corpus()
+      const data = await api.corpus(activeIndustry)
       setLoad({ kind: 'ready', data })
     } catch (e) {
       setLoad({ kind: 'error', message: e instanceof Error ? e.message : 'failed to load corpus' })
     }
-  }, [])
+  }, [activeIndustry])
 
   useEffect(() => {
     let alive = true
     const init = async () => {
       try {
-        const data = await api.corpus()
+        const data = await api.corpus(activeIndustry)
         if (alive) setLoad({ kind: 'ready', data })
       } catch (e) {
         if (alive)
@@ -59,12 +61,33 @@ export function Corpus() {
     return () => {
       alive = false
     }
-  }, [])
+  }, [activeIndustry])
 
   const recrawl = async (url: string) => {
     setBusy((b) => new Set(b).add(url))
     try {
-      await api.ingest({ urls: [url] })
+      await api.ingest({ urls: [url], industry: activeIndustry })
+      await refresh()
+    } finally {
+      setBusy((b) => {
+        const n = new Set(b)
+        n.delete(url)
+        return n
+      })
+    }
+  }
+
+  // Remove a seed and all its chunks. Confirm first showing the chunk count that will be
+  // dropped — re-adding re-pays the crawl+embed (MULTI_INDUSTRY.md §5.7).
+  const remove = async (url: string, chunks: number) => {
+    const ok = window.confirm(
+      `Remove this source and its ${chunks.toLocaleString()} indexed ` +
+        `chunk${chunks === 1 ? '' : 's'}? Re-adding it will re-crawl from scratch.`,
+    )
+    if (!ok) return
+    setBusy((b) => new Set(b).add(url))
+    try {
+      await api.removeSeed({ url, industry: activeIndustry })
       await refresh()
     } finally {
       setBusy((b) => {
@@ -80,9 +103,13 @@ export function Corpus() {
     return <div className="p-6 text-sm text-accent-2">Failed to load — {load.message}</div>
 
   const { stats, sources } = load.data
+  const activeLabel = industries.find((i) => i.id === activeIndustry)?.label ?? activeIndustry
   return (
     <div className="h-full overflow-auto p-6">
-      <h1 className="mb-4 text-lg text-ink">Corpus &amp; index</h1>
+      <h1 className="mb-4 flex items-baseline gap-2 text-lg text-ink">
+        Corpus &amp; index
+        <span className="font-mono text-[11px] text-dim">· {activeLabel}</span>
+      </h1>
 
       <div className="mb-6 grid grid-cols-2 gap-3 sm:grid-cols-4">
         <Stat label="chunks indexed" value={stats.chunks.toLocaleString()} />
@@ -121,6 +148,7 @@ export function Corpus() {
                   source={s}
                   busy={busy.has(s.url)}
                   onRecrawl={() => recrawl(s.url)}
+                  onRemove={() => remove(s.url, s.chunks)}
                 />
               ))
             )}
@@ -149,10 +177,12 @@ function SourceRow({
   source,
   busy,
   onRecrawl,
+  onRemove,
 }: {
   source: CorpusSource
   busy: boolean
   onRecrawl: () => void
+  onRemove: () => void
 }) {
   const crawling = busy || source.status === 'crawling'
   let host = source.url
@@ -183,14 +213,25 @@ function SourceRow({
         <StatusBadge status={crawling ? 'crawling' : source.status} error={source.error} />
       </td>
       <td className="px-3 py-2 text-right">
-        <button
-          type="button"
-          onClick={onRecrawl}
-          disabled={crawling}
-          className="rounded border border-line px-2 py-1 font-mono text-[10px] text-muted hover:bg-hover disabled:opacity-40"
-        >
-          {crawling ? '…' : 'recrawl'}
-        </button>
+        <div className="flex items-center justify-end gap-1.5">
+          <button
+            type="button"
+            onClick={onRecrawl}
+            disabled={crawling}
+            className="rounded border border-line px-2 py-1 font-mono text-[10px] text-muted hover:bg-hover disabled:opacity-40"
+          >
+            {crawling ? '…' : 'recrawl'}
+          </button>
+          <button
+            type="button"
+            onClick={onRemove}
+            disabled={crawling}
+            title="Remove this source and all its indexed chunks"
+            className="rounded border border-line px-2 py-1 font-mono text-[10px] text-dim hover:border-accent-2 hover:text-accent-2 disabled:opacity-40"
+          >
+            remove
+          </button>
+        </div>
       </td>
     </tr>
   )
@@ -217,6 +258,7 @@ function StatusBadge({ status, error }: { status: SourceStatus; error: string | 
 }
 
 function AddSeed({ busy, onAdded }: { busy: boolean; onAdded: () => Promise<void> }) {
+  const { activeIndustry } = useIndustry()
   const [url, setUrl] = useState('')
   const [type, setType] = useState<SourceType>('framework')
   const [pending, setPending] = useState(false)
@@ -228,7 +270,7 @@ function AddSeed({ busy, onAdded }: { busy: boolean; onAdded: () => Promise<void
     setPending(true)
     setErr(null)
     try {
-      const res = await api.addSeed({ url: url.trim(), source_type: type })
+      const res = await api.addSeed({ url: url.trim(), source_type: type, industry: activeIndustry })
       if (!res.ok && res.errors.length) setErr(res.errors[0])
       else setUrl('')
       await onAdded()

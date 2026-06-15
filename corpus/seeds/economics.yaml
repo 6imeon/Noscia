@@ -1,0 +1,19 @@
+# Noscia Economics & Macro corpus seeds.
+#
+# Curated, narrow, vertical — quality over coverage (CLAUDE.md rule 11). Every seed is an
+# *authoritative* macro source: a central bank, statistical agency, or standards/research
+# body. We never crawl the open web (rule 13) — depth comes from each site's own internal
+# links + curated PDFs. Seed schema is identical to seeds/esg.yaml (see its header for the
+# `crawl:` knobs). `source_type` reuses the ESG literals loosely for non-ESG verticals.
+
+seeds:
+  - { url: https://www.federalreserve.gov/publications.htm, source_type: regulator, org: "US Federal Reserve", cadence: weekly }
+  - { url: https://www.ecb.europa.eu/press/research-publications/html/index.en.html, source_type: regulator, org: "European Central Bank", cadence: weekly }
+  - { url: https://www.bis.org/forum/research.htm, source_type: regulator, org: "Bank for International Settlements", cadence: weekly }
+  - { url: https://www.imf.org/en/Publications, source_type: report, org: "IMF", cadence: weekly, crawl: { max_depth: 1, max_pages: 30, max_pdfs: 6 } }
+  - { url: https://www.worldbank.org/en/research, source_type: report, org: "World Bank", cadence: weekly }
+  - { url: https://www.oecd.org/en/topics/economy.html, source_type: ngo, org: "OECD", cadence: weekly }
+  - { url: https://www.nber.org/papers, source_type: report, org: "NBER", cadence: weekly, crawl: { max_depth: 1, max_pages: 30 } }
+  - { url: https://www.bea.gov/news/current-releases, source_type: regulator, org: "US Bureau of Economic Analysis", cadence: daily }
+  - { url: https://www.bls.gov/bls/newsrels.htm, source_type: regulator, org: "US Bureau of Labor Statistics", cadence: daily }
+  - { url: https://www.bankofengland.co.uk/news/publications, source_type: regulator, org: "Bank of England", cadence: weekly }

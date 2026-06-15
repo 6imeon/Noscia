@@ -1,0 +1,15 @@
+# Noscia Agriculture & Food corpus seeds.
+#
+# Curated, narrow, vertical — quality over coverage (rule 11). Authoritative food &
+# agriculture agencies, safety standards, and research institutes only; never open-web
+# (rule 13). Seed schema identical to seeds/esg.yaml (see its header for the `crawl:` knobs).
+
+seeds:
+  - { url: https://www.fao.org/publications/en, source_type: ngo, org: "FAO", cadence: weekly, crawl: { max_depth: 1, max_pages: 30, max_pdfs: 6 } }
+  - { url: https://www.ers.usda.gov/publications/, source_type: report, org: "USDA Economic Research Service", cadence: weekly }
+  - { url: https://www.efsa.europa.eu/en/publications, source_type: regulator, org: "EFSA", cadence: weekly }
+  - { url: https://www.fao.org/fao-who-codexalimentarius/standards/en/, source_type: framework, org: "Codex Alimentarius", cadence: monthly }
+  - { url: https://www.cgiar.org/research/publications/, source_type: ngo, org: "CGIAR", cadence: weekly }
+  - { url: https://www.ifpri.org/publications/, source_type: report, org: "IFPRI", cadence: weekly }
+  - { url: https://www.ifoam.bio/our-work/how/standards-certification, source_type: ngo, org: "IFOAM Organics International", cadence: monthly }
+  - { url: https://www.oecd.org/en/topics/agriculture.html, source_type: ngo, org: "OECD Agriculture", cadence: weekly }

@@ -13,6 +13,12 @@ from pydantic import BaseModel, Field
 
 Tier = Literal["fast", "quality"]
 
+# The active vertical a request operates on (multi-industry; MULTI_INDUSTRY.md). Every
+# retrieval/corpus request carries it; the default keeps single-corpus callers working
+# and makes each backend change ship invisibly (everything stays ESG until a second
+# vertical is added). The stable slug is also the value stored in `chunks.industry`.
+DEFAULT_INDUSTRY = "esg"
+
 # Single source of truth for source-type strings; the frontend maps these to
 # the §8.2 color tokens. Keep in sync with corpus seed `source_type` values.
 SourceType = Literal["framework", "regulator", "ratings", "report", "ngo", "news"]
@@ -33,6 +39,7 @@ class SearchRequest(BaseModel):
     # Opt-in, BYOK: synthesize one query-focused answer over the top passages.
     # Silently ignored (answer stays null) when no reasoning key is configured.
     summarize: bool = False
+    industry: str = DEFAULT_INDUSTRY  # the active vertical to search within
 
 
 class PipelineTrace(BaseModel):
@@ -90,6 +97,7 @@ class StructuredRequest(BaseModel):
     tier: Tier = "quality"
     # Empty ⇒ AUTO mode (fields inferred from the query). Non-empty ⇒ MANUAL fixed schema.
     fields: list[StructuredField] = Field(default_factory=list, max_length=8)
+    industry: str = DEFAULT_INDUSTRY  # the active vertical to extract within
 
 
 class ExtractedField(BaseModel):
@@ -137,6 +145,7 @@ class CorpusSource(BaseModel):
 class CorpusResponse(BaseModel):
     stats: CorpusStats
     sources: list[CorpusSource]
+    industry: str = DEFAULT_INDUSTRY  # the vertical this corpus view is scoped to
 
 
 class AddSeedRequest(BaseModel):
@@ -144,11 +153,25 @@ class AddSeedRequest(BaseModel):
     source_type: SourceType
     org: str | None = None
     cadence: str = "monthly"
+    industry: str = DEFAULT_INDUSTRY  # the vertical the new seed feeds
 
 
 class IngestRequest(BaseModel):
     # Omit `urls` to (re)ingest every registered seed.
     urls: list[str] | None = None
+    industry: str = DEFAULT_INDUSTRY  # the vertical to (re)crawl within
+
+
+class RemoveSeedRequest(BaseModel):
+    # Drop a seed and every chunk it produced from a vertical. Industry-scoped: you can
+    # only remove from the vertical you're in (MULTI_INDUSTRY.md §5.7).
+    url: str = Field(min_length=1)
+    industry: str = DEFAULT_INDUSTRY
+
+
+class RemoveSeedResponse(BaseModel):
+    ok: bool
+    removed_chunks: int  # chunks dropped — the count the UI confirmed before removing
 
 
 class IngestResponse(BaseModel):
@@ -156,6 +179,25 @@ class IngestResponse(BaseModel):
     indexed_pages: int
     chunks: int
     errors: list[str] = Field(default_factory=list)
+
+
+# --- /industries (the setup menu + switcher; MULTI_INDUSTRY.md §5.5) ------
+class Industry(BaseModel):
+    id: str  # stable slug; the value stored in chunks.industry
+    label: str
+    blurb: str
+    icon: str
+    active: bool  # is this the caller's currently-loaded vertical
+    loaded: bool  # has it been crawled (sources/chunks exist) — selectable without a build
+
+
+class IndustriesResponse(BaseModel):
+    industries: list[Industry]
+    active: str  # the caller's active industry id
+
+
+class SelectIndustryRequest(BaseModel):
+    id: str = Field(min_length=1)  # the vertical to load (must be in the catalog)
 
 
 # --- /providers (BYOK key status; never the raw key) ---------------------

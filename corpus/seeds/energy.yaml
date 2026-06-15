@@ -1,0 +1,15 @@
+# Noscia Energy & Climate corpus seeds.
+#
+# Curated, narrow, vertical — quality over coverage (rule 11). Authoritative energy agencies,
+# climate-science bodies, and the transition evidence base only; never open-web (rule 13).
+# Seed schema identical to seeds/esg.yaml (see its header for the `crawl:` knobs).
+
+seeds:
+  - { url: https://www.iea.org/analysis, source_type: report, org: "International Energy Agency", cadence: weekly, crawl: { max_depth: 1, max_pages: 30, max_pdfs: 6 } }
+  - { url: https://www.irena.org/Publications, source_type: ngo, org: "IRENA", cadence: weekly }
+  - { url: https://www.eia.gov/analysis/, source_type: regulator, org: "US Energy Information Administration", cadence: daily }
+  - { url: https://www.ipcc.ch/reports/, source_type: framework, org: "IPCC", cadence: monthly, crawl: { max_depth: 1, max_pages: 25, max_pdfs: 8 } }
+  - { url: https://www.nrel.gov/research/publications.html, source_type: report, org: "NREL", cadence: weekly }
+  - { url: https://ember-energy.org/insights/, source_type: ngo, org: "Ember", cadence: weekly }
+  - { url: https://www.energy.gov/science-innovation/energy-sources, source_type: regulator, org: "US Department of Energy", cadence: weekly }
+  - { url: https://ieefa.org/research, source_type: ngo, org: "IEEFA", cadence: weekly }

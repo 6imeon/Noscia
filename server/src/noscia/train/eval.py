@@ -26,6 +26,7 @@ import json
 import math
 from collections.abc import Callable
 from dataclasses import dataclass
+from functools import partial
 from pathlib import Path
 from urllib.parse import urlparse
 
@@ -140,27 +141,28 @@ def evaluate(name: str, retriever: Retriever, queries: list[EvalQuery], k: int) 
 
 # --- Built-in retrievers over the live store (Quality / Fast tiers) ----------
 
-def quality_retriever(query: str, k: int) -> list[str]:
+def quality_retriever(query: str, k: int, industry: str = "esg") -> list[str]:
     from ..search.embed import embed_query
     from ..search.recency import apply_recency_prior
     from ..search.store import get_store
 
-    fused = get_store().hybrid_search(query, embed_query(query), k)
+    fused = get_store().hybrid_search(query, embed_query(query), k, industry)
     hits = apply_recency_prior(fused.hits)  # mirror the live pipeline's recency prior
     return [h.chunk.url for h in hits]
 
 
-def fast_retriever(query: str, k: int) -> list[str]:
+def fast_retriever(query: str, k: int, industry: str = "esg") -> list[str]:
     from ..search.embed import embed_query
     from ..search.recency import apply_recency_prior
     from ..search.store import get_store
 
-    fused = get_store().dense_search(embed_query(query), k)
+    fused = get_store().dense_search(embed_query(query), k, industry)
     hits = apply_recency_prior(fused.hits)
     return [h.chunk.url for h in hits]
 
 
-RETRIEVERS: dict[str, Retriever] = {
+# Tier → the base retriever; bound to a vertical via functools.partial in main().
+RETRIEVERS: dict[str, Callable[..., list[str]]] = {
     "quality": quality_retriever,
     "fast": fast_retriever,
 }
@@ -177,17 +179,27 @@ def _print_report(rep: Report, per_query: bool) -> None:
 
 
 def main() -> None:
-    ap = argparse.ArgumentParser(description="ESG retrieval eval (nDCG@10 / MRR / Recall@10).")
+    ap = argparse.ArgumentParser(description="Retrieval eval (nDCG@10 / MRR / Recall@10).")
     ap.add_argument("--tier", choices=["quality", "fast", "both"], default="both")
     ap.add_argument("--k", type=int, default=DEFAULT_K)
+    ap.add_argument(
+        "--industry",
+        default="esg",
+        help="vertical to score; loads corpus/eval/<industry>_queries.jsonl (default: esg)",
+    )
     ap.add_argument("--per-query", action="store_true", help="print the per-query breakdown")
     args = ap.parse_args()
 
-    queries = load_eval()
+    eval_path = EVAL_PATH.with_name(f"{args.industry}_queries.jsonl")
+    if not eval_path.exists():
+        ap.error(f"no eval set for '{args.industry}': {eval_path} not found")
+    queries = load_eval(eval_path)
     tiers = ["quality", "fast"] if args.tier == "both" else [args.tier]
-    print(f"Evaluating {len(queries)} ESG queries from {EVAL_PATH.name}")
+    print(f"Evaluating {len(queries)} {args.industry} queries from {eval_path.name}")
     for tier in tiers:
-        rep = evaluate(tier, RETRIEVERS[tier], queries, args.k)
+        # Bind the tier's retriever to the chosen vertical (industry-scoped store calls).
+        retriever = partial(RETRIEVERS[tier], industry=args.industry)
+        rep = evaluate(tier, retriever, queries, args.k)
         _print_report(rep, args.per_query)
 
 

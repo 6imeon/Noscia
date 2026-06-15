@@ -15,6 +15,7 @@ import {
   type StructuredResponse,
   type Tier,
 } from '../lib/api'
+import { useIndustry } from '../app/industry'
 import { CiteHosts, Sources } from './Citations'
 
 type Field = { name: string; description: string }
@@ -47,6 +48,7 @@ export function StructuredPanel({
   active: boolean // the Structured tab is the visible one — gate auto-extract on it
   onSelect: (r: SearchResult) => void
 }) {
+  const { activeIndustry } = useIndustry()
   const [fields, setFields] = useState<Field[]>([]) // empty ⇒ AUTO; non-empty ⇒ CUSTOM
   const [showEditor, setShowEditor] = useState(false)
   const [status, setStatus] = useState<Status>({ kind: 'idle' })
@@ -70,6 +72,7 @@ export function StructuredPanel({
       const data = await api.structured({
         query,
         tier,
+        industry: activeIndustry,
         fields: useFields
           .filter((f) => f.name.trim())
           .map((f) => ({ name: f.name.trim(), description: f.description.trim() })),

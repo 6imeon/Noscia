@@ -4,6 +4,145 @@ All notable changes to Noscia are recorded here. Updated at the **end of each ph
 (see [IMPLEMENTATION.md](IMPLEMENTATION.md) §7). Format loosely follows
 [Keep a Changelog](https://keepachangelog.com/); dates are absolute.
 
+## Phase D — Full vertical catalog + second live corpus — 2026-06-15
+
+The multi-industry feature is proven end-to-end: ten selectable verticals, embeddings
+strictly on-pick, and a real second corpus (Economics) that searches in isolation from ESG.
+
+### Ten verticals, embedded on demand (`corpus/seeds/`, `corpus/industries.yaml`)
+- Authored the 9 non-ESG seed lists from `corpus/INDUSTRIES.md` (economics, healthcare,
+  cybersecurity, ai, energy, finance, agriculture, pharma, space) and registered all 10 in
+  the catalog. Every vertical is a **selectable option**, but only ESG ships pre-embedded —
+  the other 9 are `loaded=false` ("builds on first use") and crawl **only when picked**
+  (`/industries/select` → `/corpus/ingest`). Nothing is pre-crawled. Fixed the picker icon
+  map (`heart`).
+
+### Economics: the live second corpus (`corpus/eval/economics_queries.jsonl`)
+- Crawled Economics via the on-pick ingest path and finalized on 3 cleanly-indexed
+  authoritative institutions — **Fed (169c), ECB (277c), BIS (65c) = 511 chunks / 59 pages**.
+  (IMF's PDF crawl wedged the synchronous request; it and the remaining sources were pruned
+  and are re-runnable via `--industry economics`.)
+- **Switch proven**: one query returns Fed/ECB/BIS under `industry=economics` vs SEC/S&P
+  Global ESG under `esg` — fully disjoint, zero cross-vertical leak (dense + hybrid). Switch
+  back to ESG is instant (Model A).
+- **Eval** (rule 9): the harness is now multi-vertical (`eval --industry <id>`). Economics
+  scores **nDCG@10 = MRR = Recall@10 = 1.000** (both tiers); ESG re-run holds at
+  **nDCG@10=0.918 / MRR=0.933** (quality) — unchanged by the recall guard below.
+
+### Bugs the live run surfaced (the DB-less unit tests could not)
+- **`/corpus` 500 for every user** — Phase A's `(:industry IS NULL OR …)` filter was
+  type-ambiguous in Postgres (`AmbiguousParameter`). Fixed with `CAST(:industry AS text)`
+  (the `::text` shorthand mis-parses under SQLAlchemy `text()`); added a regression guard.
+- **Retrieved chunks mis-reported `industry='esg'`** — `_row_to_hit` never hydrated the
+  column. Added `industry` to both retrieval SELECTs + the `Chunk` reconstruction.
+- **Filtered-ANN recall starvation** (the deferred Phase A guard, landed here) — a sparse
+  vertical returned **0** dense hits because HNSW's default `ef_search=40` < `PREFETCH` and
+  the `industry` filter applies after the index traversal. Added `SET LOCAL hnsw.ef_search =
+  200` before both ANN queries (transaction-scoped, never leaks onto the pooled connection);
+  economics now fills `top_k` where it returned 0.
+
+### Gates
+- Server: `ruff` clean, **88 pytest** (added catalog-completeness, CAST-regression, and
+  recall-guard guards; the multi-vertical eval was validated live). Web: lint + build + 3
+  vitest green.
+
+## Phase C — Onboarding UX (setup menu + switcher) — 2026-06-15
+
+The vertical is now chosen **in the UI**: a first-run setup menu, a header switcher, and
+every search/extract/corpus call carries the active vertical.
+
+### Setup gate + switcher (`app/IndustrySetup.tsx`, `app/industry.ts`, `App.tsx`)
+- `App` resolves the active vertical from `GET /industries` on mount: a loaded+active
+  vertical boots straight to search; an unchosen / not-yet-built one shows a full-screen
+  **setup menu** (cards: label · blurb · icon · `ready`/`builds on first use`). A returning
+  user's `localStorage` choice skips the gate (server pref stays source of truth); a missing
+  catalog degrades to the app rather than trapping the user behind the gate.
+- Picking a vertical → `POST /industries/select`; if it isn't `loaded`, a **“building
+  corpus”** state runs the first ingest (`POST /corpus/ingest {industry}`) before entering.
+  Already-loaded verticals switch **instantly** (Model A — no recrawl).
+- Rail-header **switcher** (active label ▾) re-opens the same picker; the view container is
+  keyed by the active vertical so switching clears stale results/corpus rows.
+
+### Active vertical threaded through every call (`app/industry.ts` context)
+- New `IndustryProvider` / `useIndustry()` — Search, Structured, and Corpus read the active
+  vertical from context (no prop-drilling through the OutputPane tab chrome) and send
+  `industry` on `search` / `structured` / `corpus` / `ingest` / `add` / `remove`.
+  `api.corpus(industry)` now scopes the Corpus view, which shows the active vertical's label.
+- Tests (`App.test.tsx`): loaded+active → straight to search; not-loaded active → gate;
+  stored choice → skips gate. Web gate green (3 vitest); Python unchanged (85).
+
+## Phase B — Industry catalog & selection — 2026-06-15
+
+The vertical becomes **chosen, not compiled in**. Still one corpus (ESG), but now
+selectable end-to-end through a real catalog + per-user preference. No UX yet (Phase C).
+
+### Catalog as checked-in config (`corpus/`)
+- `corpus/seeds.esg.yaml` → **`corpus/seeds/esg.yaml`** (byte-identical move; the seed
+  schema is unchanged). New **`corpus/industries.yaml`** — the catalog: `{id, label, blurb,
+  icon, seeds}` per vertical (just `esg` today; the 10-vertical v1 list waits in
+  [corpus/INDUSTRIES.md](corpus/INDUSTRIES.md)). Industries are static content, not a DB table.
+- `ingest/run.py`: `load_industries()` reads the catalog; `seeds_path(industry)` resolves a
+  vertical's seed file from it (legacy ESG path kept as a fallback so a missing catalog never
+  breaks ingest); `load_seeds(industry)` reads the resolved file.
+
+### Per-user active vertical (`db/`, `user.py`, `corpus.py`)
+- New `user_prefs(user_id, active_industry, updated_at)` table (idempotent). "Loaded one at a
+  time" is **this row**, not a physical data swap — switching never recrawls (Model A).
+- `user.py`: `get_active_industry(user)` / `set_active_industry(user, id)` next to
+  `current_user` — keyed by `User.id` (`solo` today; SSO-swappable with no call-site change).
+  `corpus.industries_loaded()` → the verticals that have crawled sources (the `loaded` flag).
+
+### Endpoints + contract (`app.py`, `contract.py` ⇄ `web/src/lib/api.ts`)
+- `GET /industries` → the catalog ⨯ this user's state (each entry `active`/`loaded`).
+  `POST /industries/select {id}` → validates against the catalog (404 otherwise), persists the
+  pref, returns the refreshed catalog. New `Industry` / `IndustriesResponse` /
+  `SelectIndustryRequest` models, mirrored in `api.ts` with `api.industries()` /
+  `api.selectIndustry(id)`.
+- Tests (`tests/test_industry.py`): catalog lists `esg` with its seed file; `seeds_path`
+  resolves to the relocated file and rejects unknown ids; `/industries` marks the active+loaded
+  vertical; select validates (404) and persists. Full suite green (85 py); web gate green.
+
+## Phase A + A′ — Multi-industry backend scoping & source removal — 2026-06-15
+
+Groundwork for **multi-vertical** Noscia (design: [MULTI_INDUSTRY.md](MULTI_INDUSTRY.md)):
+the corpus stops being hard-wired ESG. This phase is **invisible** — every change
+defaults to `industry = 'esg'`, so the app behaves exactly as before until a second
+vertical is added (Model A: all verticals coexist, "loaded" = the active filter).
+
+### Scope key end-to-end (`db/`, `search/store.py`, `search/pipeline.py`)
+- `chunks.industry` / `sources.industry` — `TEXT NOT NULL DEFAULT 'esg'` (idempotent
+  `ADD COLUMN`; the default *is* the migration — every existing row becomes ESG with no
+  data move), each with a btree index — the seam the `PARTITION BY LIST` upgrade builds on.
+- `VectorStore` threads `industry` through `upsert` / `hybrid_search` / `dense_search` /
+  `count` / `prune_pages` / `existing_hashes`; **both** retrieval CTEs (dense + BM25) now
+  filter `WHERE industry = :industry`, so a search never crosses verticals. `Chunk` gains
+  `industry` (defaults `'esg'`). `run_search` forwards `req.industry`.
+
+### Contract + ingest (`contract.py` ⇄ `web/src/lib/api.ts`, `ingest/run.py`)
+- `industry` added to `SearchRequest` / `StructuredRequest` / `IngestRequest` /
+  `AddSeedRequest` / `CorpusResponse` (both sides, rule 5; defaults `'esg'`).
+- Ingest CLI gains `--industry <id>`; every `Chunk` and `sources` row is tagged; `--due`,
+  prune, and hash-diff are vertical-scoped. Phase A keeps the single `seeds.esg.yaml`
+  (per-industry seed files land in Phase B). The in-memory search cache key became
+  `(industry, query, tier)`.
+- Eval parity holds: `train/eval.py` retrievers default to `'esg'`, so rule 9's
+  nDCG@10/MRR gate scores the ESG vertical exactly as before.
+
+### Source add **and** remove (`store.py`, `corpus.py`, `app.py`, `views/Corpus.tsx`)
+- New `POST /corpus/remove` (`RemoveSeedRequest`/`RemoveSeedResponse`): `delete_source`
+  drops every chunk discovered under a seed (seed page + all deep-crawled pages, matched
+  by `source_url`) **and** its `sources` row, atomically and industry-scoped.
+- Corpus view: each source row gains **remove** (confirms the chunk count it will drop —
+  re-adding re-pays the crawl) alongside the existing **recrawl** (Refresh). Add-source
+  form unchanged; it now tags the active vertical.
+
+### Tests
+- New `tests/test_industry.py` (no DB/models): both hybrid legs + the dense leg carry the
+  scope predicate; `run_search` forwards `industry` and defaults it to `'esg'`;
+  `corpus.delete_source` is `(url, industry)`-scoped and drops chunks + the sources row;
+  every industry-carrying contract model defaults to `'esg'`. Full suite green (79 py);
+  web lint/tsc/vitest/build green.
+
 ## Phase 2.5 — Corpus depth (deep crawl) — 2026-06-14
 
 The index went from **8 single landing pages** to a professional-scale corpus by

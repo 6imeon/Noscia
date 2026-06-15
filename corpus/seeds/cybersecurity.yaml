@@ -1,0 +1,15 @@
+# Noscia Cybersecurity corpus seeds.
+#
+# Curated, narrow, vertical — quality over coverage (rule 11). Authoritative security
+# frameworks, national CERT/advisory feeds, and threat-intel standards only; never open-web
+# (rule 13). Seed schema identical to seeds/esg.yaml (see its header for the `crawl:` knobs).
+
+seeds:
+  - { url: https://csrc.nist.gov/publications, source_type: framework, org: "NIST CSRC", cadence: weekly, crawl: { max_depth: 1, max_pages: 30, max_pdfs: 8 } }
+  - { url: https://www.cisa.gov/news-events/cybersecurity-advisories, source_type: regulator, org: "US CISA", cadence: daily }
+  - { url: https://attack.mitre.org/, source_type: framework, org: "MITRE ATT&CK", cadence: monthly, crawl: { max_depth: 2, max_pages: 40 } }
+  - { url: https://owasp.org/www-project-top-ten/, source_type: ngo, org: "OWASP", cadence: monthly }
+  - { url: https://www.cisecurity.org/controls, source_type: framework, org: "Center for Internet Security", cadence: monthly }
+  - { url: https://www.enisa.europa.eu/publications, source_type: regulator, org: "ENISA", cadence: weekly }
+  - { url: https://www.cve.org/, source_type: framework, org: "CVE / MITRE", cadence: daily }
+  - { url: https://krebsonsecurity.com/, source_type: news, org: "Krebs on Security", cadence: daily }

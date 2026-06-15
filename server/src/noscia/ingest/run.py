@@ -39,7 +39,34 @@ from ..search.store import Chunk, get_store
 from .chunk import chunk_markdown
 from .crawl import CrawledPage, check_conditional, crawl_many, crawl_site
 
-SEEDS_PATH = Path(__file__).resolve().parents[4] / "corpus" / "seeds.esg.yaml"
+# Multi-industry (MULTI_INDUSTRY.md): the default vertical and the catalog/seed layout.
+# A vertical's seeds live at corpus/seeds/<id>.yaml, resolved via corpus/industries.yaml.
+DEFAULT_INDUSTRY = "esg"
+CORPUS_DIR = Path(__file__).resolve().parents[4] / "corpus"
+INDUSTRIES_PATH = CORPUS_DIR / "industries.yaml"
+# Legacy single-corpus path, kept as a fallback so ingest still works if the catalog
+# is absent (e.g. a partial checkout). The canonical path is corpus/seeds/esg.yaml.
+SEEDS_PATH = CORPUS_DIR / "seeds" / "esg.yaml"
+
+
+def load_industries() -> list[dict]:
+    """The industry catalog (corpus/industries.yaml): one entry per selectable vertical.
+    Each entry is ``{id, label, blurb, icon, seeds}``. Empty list if the file is absent."""
+    if not INDUSTRIES_PATH.exists():
+        return []
+    data = yaml.safe_load(INDUSTRIES_PATH.read_text()) or {}
+    return data.get("industries", [])
+
+
+def seeds_path(industry: str = DEFAULT_INDUSTRY) -> Path:
+    """Resolve a vertical's seed file from the catalog. Falls back to the legacy ESG path
+    so a missing catalog never breaks the existing single-corpus flow."""
+    for entry in load_industries():
+        if entry.get("id") == industry:
+            return CORPUS_DIR / entry["seeds"]
+    if industry == DEFAULT_INDUSTRY:
+        return SEEDS_PATH
+    raise ValueError(f"unknown industry '{industry}' (not in {INDUSTRIES_PATH.name})")
 
 # Deep-crawl defaults (per-seed `crawl:` block in the YAML overrides these).
 DEFAULT_MAX_DEPTH = 1  # 0 = single page (just the seed)
@@ -61,8 +88,9 @@ DEFAULT_EXCLUDE = [
 ]
 
 
-def load_seeds() -> list[dict]:
-    data = yaml.safe_load(SEEDS_PATH.read_text()) or {}
+def load_seeds(industry: str = DEFAULT_INDUSTRY) -> list[dict]:
+    """Load a vertical's seed specs from corpus/seeds/<id>.yaml (resolved via the catalog)."""
+    data = yaml.safe_load(seeds_path(industry).read_text()) or {}
     seeds = data.get("seeds", [])
     for s in seeds:
         s.setdefault("org", None)
@@ -70,11 +98,14 @@ def load_seeds() -> list[dict]:
     return seeds
 
 
-def register_seeds() -> list[dict]:
-    """Load the YAML into the `sources` table (idempotent). Returns the seeds."""
-    seeds = load_seeds()
+def register_seeds(industry: str = DEFAULT_INDUSTRY) -> list[dict]:
+    """Load the YAML into the `sources` table (idempotent), tagging each seed's vertical.
+    Returns the seeds."""
+    seeds = load_seeds(industry)
     for s in seeds:
-        corpus.upsert_source(s["url"], s["source_type"], s.get("org"), s.get("cadence", "monthly"))
+        corpus.upsert_source(
+            s["url"], s["source_type"], s.get("org"), s.get("cadence", "monthly"), industry
+        )
     return seeds
 
 
@@ -93,19 +124,21 @@ class PageResult:
     error: str | None = None
 
 
-def _index_page(page: CrawledPage, spec: dict, source_url: str) -> PageResult:
+def _index_page(
+    page: CrawledPage, spec: dict, source_url: str, industry: str = DEFAULT_INDUSTRY
+) -> PageResult:
     """Diff one crawled page against the index; embed only what changed.
 
     Page-scoped: upserts changed/new chunks, prunes chunks that vanished *within* the
     page. Source status/counts are owned by the seed orchestrator (``_ingest_seed``),
-    not here — one seed now fans out to many pages.
+    not here — one seed now fans out to many pages. Every chunk is tagged ``industry``.
     """
     store = get_store()
     text_chunks = chunk_markdown(page.markdown)
     if not text_chunks:
         return PageResult(url=page.url, error="no text after chunking")
 
-    existing = store.existing_hashes(page.url)  # {chunk_id: content_hash}
+    existing = store.existing_hashes(page.url, industry)  # {chunk_id: content_hash}
     new_ids: set[str] = set()
     changed: list[tuple[str, object]] = []  # (id, TextChunk) needing an embed
     for tc in text_chunks:
@@ -128,6 +161,7 @@ def _index_page(page: CrawledPage, spec: dict, source_url: str) -> PageResult:
             token_count=tc.token_count,
             dense=vec,
             published_at=page.published_at,
+            industry=industry,
         )
         for (cid, tc), vec in zip(changed, vectors, strict=True)
     ]
@@ -170,7 +204,9 @@ def _crawl_config(spec: dict) -> CrawlConfig:
     )
 
 
-async def _ingest_seed(spec: dict, *, conditional: bool) -> dict:
+async def _ingest_seed(
+    spec: dict, *, conditional: bool, industry: str = DEFAULT_INDUSTRY
+) -> dict:
     """Crawl + incrementally index one seed (single page or bounded deep crawl)."""
     seed = spec["url"]
     cfg = _crawl_config(spec)
@@ -206,12 +242,12 @@ async def _ingest_seed(spec: dict, *, conditional: bool) -> dict:
         corpus.set_status(seed, "error", msg)
         return {"errors": errors or [{"url": seed, "error": msg}]}
 
-    results = [_index_page(p, spec, seed) for p in ok_pages]
+    results = [_index_page(p, spec, seed, industry) for p in ok_pages]
     errors += [{"url": r.url, "error": r.error} for r in results if r.error]
     indexed = [r for r in results if not r.error]
 
     # Source-level page prune: chunks under this seed whose page is gone from the site.
-    removed_pages = get_store().prune_pages(seed, [r.url for r in indexed])
+    removed_pages = get_store().prune_pages(seed, [r.url for r in indexed], industry)
 
     chunks = sum(r.chunks for r in indexed)
     corpus.finish_source(seed, pages=len(indexed), chunks=chunks)
@@ -228,8 +264,10 @@ async def _ingest_seed(spec: dict, *, conditional: bool) -> dict:
     }
 
 
-async def ingest_specs(specs: list[dict], *, conditional: bool = True) -> dict:
-    """Crawl + incrementally index each seed spec, one seed at a time.
+async def ingest_specs(
+    specs: list[dict], *, conditional: bool = True, industry: str = DEFAULT_INDUSTRY
+) -> dict:
+    """Crawl + incrementally index each seed spec, one seed at a time, into ``industry``.
 
     Seeds run sequentially (each deep crawl is already internally concurrent and
     memory-adaptive — running several browsers at once would blow the 18 GB box).
@@ -245,7 +283,7 @@ async def ingest_specs(specs: list[dict], *, conditional: bool = True) -> dict:
         "errors": [],
     }
     for spec in specs:
-        res = await _ingest_seed(spec, conditional=conditional)
+        res = await _ingest_seed(spec, conditional=conditional, industry=industry)
         for key in (
             "indexed_pages",
             "not_modified",
@@ -260,38 +298,46 @@ async def ingest_specs(specs: list[dict], *, conditional: bool = True) -> dict:
     return agg
 
 
-async def ingest_all(*, conditional: bool = True) -> dict:
-    seeds = register_seeds()
-    return await ingest_specs(seeds, conditional=conditional)
+async def ingest_all(*, conditional: bool = True, industry: str = DEFAULT_INDUSTRY) -> dict:
+    seeds = register_seeds(industry)
+    return await ingest_specs(seeds, conditional=conditional, industry=industry)
 
 
-async def ingest_due() -> dict:
-    """Recrawl only sources whose cadence window has elapsed (SPEC §7 adaptive cadence)."""
-    register_seeds()
-    due = corpus.sources_due()
+async def ingest_due(industry: str = DEFAULT_INDUSTRY) -> dict:
+    """Recrawl only sources whose cadence window has elapsed (SPEC §7 adaptive cadence),
+    scoped to one vertical."""
+    register_seeds(industry)
+    due = corpus.sources_due(industry)
     if not due:
         return {"ok": True, "due": 0, "indexed_pages": 0, "chunks": 0, "errors": []}
-    summary = await ingest_specs(due)
+    summary = await ingest_specs(due, industry=industry)
     summary["due"] = len(due)
     return summary
 
 
 def main() -> None:
-    ap = argparse.ArgumentParser(description="Crawl ESG seeds and (incrementally) index them.")
+    ap = argparse.ArgumentParser(description="Crawl seeds and (incrementally) index them.")
     ap.add_argument("--due", action="store_true", help="only sources past their cadence window")
     ap.add_argument("--full", action="store_true", help="force re-crawl (skip the 304 probe)")
+    ap.add_argument(
+        "--industry",
+        default=DEFAULT_INDUSTRY,
+        help="vertical to crawl into (default: esg); tags every chunk + source",
+    )
     args = ap.parse_args()
 
     db.init_schema()
     if args.due:
-        register_seeds()
-        due = corpus.sources_due()
-        print(f"{len(due)} source(s) due. Crawling + indexing…")
-        summary = asyncio.run(ingest_due())
+        register_seeds(args.industry)
+        due = corpus.sources_due(args.industry)
+        print(f"{len(due)} source(s) due in '{args.industry}'. Crawling + indexing…")
+        summary = asyncio.run(ingest_due(args.industry))
     else:
-        seeds = register_seeds()
-        print(f"Registered {len(seeds)} seeds. Crawling + indexing…")
-        summary = asyncio.run(ingest_specs(seeds, conditional=not args.full))
+        seeds = register_seeds(args.industry)
+        print(f"Registered {len(seeds)} seeds in '{args.industry}'. Crawling + indexing…")
+        summary = asyncio.run(
+            ingest_specs(seeds, conditional=not args.full, industry=args.industry)
+        )
 
     print(
         f"Done: {summary['indexed_pages']} pages indexed"

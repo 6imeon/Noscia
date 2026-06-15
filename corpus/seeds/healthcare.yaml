@@ -1,0 +1,15 @@
+# Noscia Healthcare & Public Health corpus seeds.
+#
+# Curated, narrow, vertical — quality over coverage (rule 11). Authoritative health agencies,
+# clinical-guideline bodies, and evidence-review libraries only; never open-web (rule 13).
+# Seed schema identical to seeds/esg.yaml (see its header for the `crawl:` knobs).
+
+seeds:
+  - { url: https://www.who.int/publications, source_type: ngo, org: "World Health Organization", cadence: weekly, crawl: { max_depth: 1, max_pages: 30, max_pdfs: 6 } }
+  - { url: https://www.cdc.gov/library/researchguides/, source_type: regulator, org: "US CDC", cadence: weekly }
+  - { url: https://www.nih.gov/health-information, source_type: regulator, org: "US NIH", cadence: weekly }
+  - { url: https://www.ecdc.europa.eu/en/publications-data, source_type: regulator, org: "ECDC", cadence: weekly }
+  - { url: https://www.nice.org.uk/guidance, source_type: framework, org: "NICE (UK)", cadence: monthly, crawl: { max_depth: 1, max_pages: 30 } }
+  - { url: https://www.uspreventiveservicestaskforce.org/uspstf/topic_search_results, source_type: framework, org: "USPSTF", cadence: monthly }
+  - { url: https://www.cochranelibrary.com/cdsr/reviews, source_type: report, org: "Cochrane", cadence: weekly }
+  - { url: https://www.ahrq.gov/research/findings/index.html, source_type: regulator, org: "US AHRQ", cadence: monthly }

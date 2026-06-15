@@ -1,0 +1,15 @@
+# Noscia Space & Aerospace corpus seeds.
+#
+# Curated, narrow, vertical — quality over coverage (rule 11). Authoritative space agencies,
+# aviation/space regulators, and technical archives only; never open-web (rule 13).
+# Seed schema identical to seeds/esg.yaml (see its header for the `crawl:` knobs).
+
+seeds:
+  - { url: https://www.nasa.gov/news/all-news/, source_type: regulator, org: "NASA", cadence: daily }
+  - { url: https://ntrs.nasa.gov/, source_type: report, org: "NASA Technical Reports Server", cadence: weekly, crawl: { max_depth: 1, max_pages: 30, max_pdfs: 8 } }
+  - { url: https://www.esa.int/About_Us/ESA_Publications, source_type: regulator, org: "European Space Agency", cadence: weekly }
+  - { url: https://www.faa.gov/space, source_type: regulator, org: "US FAA (Commercial Space)", cadence: weekly }
+  - { url: https://www.unoosa.org/oosa/en/ourwork/index.html, source_type: ngo, org: "UNOOSA", cadence: monthly }
+  - { url: https://www.itu.int/en/ITU-R/space/Pages/default.aspx, source_type: regulator, org: "ITU (Radiocommunication)", cadence: monthly }
+  - { url: https://www.aiaa.org/publications, source_type: ngo, org: "AIAA", cadence: monthly }
+  - { url: https://spacenews.com/, source_type: news, org: "SpaceNews", cadence: daily }

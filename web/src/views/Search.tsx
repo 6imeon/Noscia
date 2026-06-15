@@ -3,6 +3,7 @@
 // opens its cited passage in the reader. Empty/loading/error/done states.
 import { useEffect, useState } from 'react'
 import { api, type SearchResponse, type SearchResult, type Tier } from '../lib/api'
+import { useIndustry } from '../app/industry'
 import { OutputPane } from '../components/OutputPane'
 import { PassageReader } from '../components/PassageReader'
 import { ResultRow } from '../components/ResultRow'
@@ -15,6 +16,7 @@ type Status =
   | { kind: 'done'; data: SearchResponse }
 
 export function Search() {
+  const { activeIndustry } = useIndustry()
   const [query, setQuery] = useState('')
   const [tier, setTier] = useState<Tier>('quality')
   const [summarize, setSummarize] = useState(true) // on by default; only sent when a key exists
@@ -35,7 +37,12 @@ export function Search() {
     setStatus({ kind: 'loading' })
     setSelected(null)
     try {
-      const data = await api.search({ query, tier, summarize: summarize && keyConfigured })
+      const data = await api.search({
+        query,
+        tier,
+        summarize: summarize && keyConfigured,
+        industry: activeIndustry,
+      })
       setStatus({ kind: 'done', data })
       setSelected(data.results[0] ?? null)
     } catch (e) {

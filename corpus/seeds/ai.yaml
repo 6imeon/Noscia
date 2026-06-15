@@ -1,0 +1,15 @@
+# Noscia Artificial Intelligence corpus seeds.
+#
+# Curated, narrow, vertical — quality over coverage (rule 11). Authoritative research
+# repositories, governance frameworks, and policy bodies only; never open-web (rule 13).
+# Seed schema identical to seeds/esg.yaml (see its header for the `crawl:` knobs).
+
+seeds:
+  - { url: https://arxiv.org/list/cs.AI/recent, source_type: report, org: "arXiv cs.AI", cadence: daily, crawl: { max_depth: 1, max_pages: 40 } }
+  - { url: https://arxiv.org/list/cs.LG/recent, source_type: report, org: "arXiv cs.LG", cadence: daily, crawl: { max_depth: 1, max_pages: 40 } }
+  - { url: https://www.nist.gov/itl/ai-risk-management-framework, source_type: framework, org: "NIST AI RMF", cadence: monthly }
+  - { url: https://oecd.ai/en/, source_type: ngo, org: "OECD.AI Policy Observatory", cadence: weekly }
+  - { url: https://digital-strategy.ec.europa.eu/en/policies/regulatory-framework-ai, source_type: regulator, org: "European Commission (AI Act)", cadence: weekly }
+  - { url: https://hai.stanford.edu/research, source_type: ngo, org: "Stanford HAI", cadence: weekly }
+  - { url: https://aclanthology.org/, source_type: report, org: "ACL Anthology", cadence: weekly, crawl: { max_depth: 1, max_pages: 30 } }
+  - { url: https://www.anthropic.com/research, source_type: report, org: "Anthropic", cadence: weekly }

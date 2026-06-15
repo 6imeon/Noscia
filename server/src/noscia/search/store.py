@@ -28,6 +28,12 @@ EMBED_DIM = 256
 # Hybrid retrieval knobs.
 PREFETCH = 100  # candidates pulled per leg (dense, bm25) before fusion
 RRF_K = 60  # Reciprocal Rank Fusion constant (standard default)
+# Filtered-ANN recall guard (MULTI_INDUSTRY.md §5.1): HNSW's default `ef_search` (40) is
+# below PREFETCH, and `WHERE industry = …` filters the candidate set *after* the index
+# traversal — so a sparse vertical can be starved of dense hits. Raise the search-list size
+# so the index explores enough nodes to fill PREFETCH within one vertical. SET LOCAL keeps
+# it transaction-scoped (never leaks onto the pooled connection).
+EF_SEARCH = 200
 
 
 @dataclass
@@ -44,6 +50,7 @@ class Chunk:
     token_count: int | None = None
     fresh: bool = False  # crawled recently (set on read; see SQL)
     published_at: datetime | None = None  # document publish date (None = unknown); drives recency
+    industry: str = "esg"  # the vertical this chunk belongs to (multi-industry scope key)
 
 
 @dataclass
@@ -75,6 +82,7 @@ def _row_to_hit(row, score: float) -> Hit:
             text=row.text,
             source_type=row.source_type,
             org=row.org,
+            industry=getattr(row, "industry", "esg"),
             content_hash=getattr(row, "content_hash", ""),
             fresh=bool(getattr(row, "fresh", False)),
             published_at=getattr(row, "published_at", None),
@@ -92,12 +100,17 @@ class VectorStore(ABC):
         """Insert/update chunks by id; return the number written."""
 
     @abstractmethod
-    def hybrid_search(self, query: str, dense: list[float], top_k: int) -> Fused:
-        """Dense (pgvector) + BM25 (pg_search) prefetch fused with RRF — Quality tier."""
+    def hybrid_search(
+        self, query: str, dense: list[float], top_k: int, industry: str = "esg"
+    ) -> Fused:
+        """Dense (pgvector) + BM25 (pg_search) prefetch fused with RRF — Quality tier.
+
+        Both legs filter ``WHERE industry = :industry`` so retrieval never crosses
+        verticals (MULTI_INDUSTRY.md §5.2)."""
 
     @abstractmethod
-    def dense_search(self, dense: list[float], top_k: int) -> Fused:
-        """Dense-only ANN — the low-latency Fast tier."""
+    def dense_search(self, dense: list[float], top_k: int, industry: str = "esg") -> Fused:
+        """Dense-only ANN — the low-latency Fast tier. Scoped to ``industry``."""
 
     @abstractmethod
     def delete_url(self, url: str) -> int:
@@ -108,15 +121,23 @@ class VectorStore(ABC):
         """Drop specific chunks by id (incremental crawl: prune vanished chunks)."""
 
     @abstractmethod
-    def existing_hashes(self, url: str) -> dict[str, str]:
+    def delete_source(self, source_url: str, industry: str = "esg") -> int:
+        """Drop every chunk discovered under a seed — the seed page *and* all its
+        deep-crawled pages share ``source_url`` — scoped to ``industry`` so removing a
+        seed never touches another vertical. Returns rows removed (the chunk count the
+        UI confirms). The `sources` row is dropped by ``corpus.delete_source``."""
+
+    @abstractmethod
+    def existing_hashes(self, url: str, industry: str = "esg") -> dict[str, str]:
         """``{chunk_id: content_hash}`` for a page — the diff base for incremental crawl."""
 
     @abstractmethod
-    def prune_pages(self, source_url: str, keep_urls: list[str]) -> int:
+    def prune_pages(self, source_url: str, keep_urls: list[str], industry: str = "esg") -> int:
         """Deep crawl: drop chunks under a seed whose page URL is no longer reachable.
 
         After a site recrawl, any page not in ``keep_urls`` has vanished (de-linked or
-        gone); remove its chunks. Returns rows removed.
+        gone); remove its chunks. Scoped to ``industry`` so verticals never prune each
+        other. Returns rows removed.
         """
 
     @abstractmethod
@@ -128,16 +149,17 @@ class VectorStore(ABC):
         """
 
     @abstractmethod
-    def count(self) -> int:
-        """Total indexed chunks (Corpus view stat / rail counter)."""
+    def count(self, industry: str | None = None) -> int:
+        """Indexed chunks (Corpus view stat / rail counter). ``None`` ⇒ every vertical;
+        an ``industry`` scopes the count to that one."""
 
 
 _UPSERT_SQL = text(
     """
     INSERT INTO chunks (id, url, source_url, title, org, source_type, text,
-                        content_hash, token_count, dense, published_at)
+                        content_hash, token_count, dense, published_at, industry)
     VALUES (:id, :url, :source_url, :title, :org, :source_type, :text, :content_hash, :token_count,
-            CAST(:dense AS vector(256)), :published_at)
+            CAST(:dense AS vector(256)), :published_at, :industry)
     ON CONFLICT (id) DO UPDATE SET
         url = EXCLUDED.url,
         source_url = EXCLUDED.source_url,
@@ -149,6 +171,7 @@ _UPSERT_SQL = text(
         token_count = EXCLUDED.token_count,
         dense = EXCLUDED.dense,
         published_at = EXCLUDED.published_at,
+        industry = EXCLUDED.industry,
         crawled_at = now()
     """
 )
@@ -162,13 +185,15 @@ _HYBRID_SQL = text(
     WITH dense AS (
         SELECT id, ROW_NUMBER() OVER (ORDER BY dense <=> CAST(:qvec AS vector(256))) AS rnk
         FROM chunks
+        WHERE industry = :industry
         ORDER BY dense <=> CAST(:qvec AS vector(256))
         LIMIT :prefetch
     ),
     lexical AS (
         SELECT id, ROW_NUMBER() OVER (ORDER BY paradedb.score(id) DESC) AS rnk
         FROM chunks
-        WHERE id @@@ paradedb.match('text', :q)
+        WHERE industry = :industry
+          AND id @@@ paradedb.match('text', :q)
         LIMIT :prefetch
     ),
     fused AS (
@@ -180,7 +205,7 @@ _HYBRID_SQL = text(
         FROM dense d FULL OUTER JOIN lexical l ON d.id = l.id
     )
     SELECT c.id, c.url, c.title, c.org, c.source_type, c.text, c.content_hash,
-           c.published_at,
+           c.industry, c.published_at,
            (c.crawled_at > now() - interval '7 days') AS fresh,
            f.rrf AS score, f.in_dense, f.in_lex
     FROM fused f JOIN chunks c ON c.id = f.id
@@ -192,10 +217,11 @@ _HYBRID_SQL = text(
 _DENSE_SQL = text(
     """
     SELECT id, url, title, org, source_type, text, content_hash,
-           published_at,
+           industry, published_at,
            (crawled_at > now() - interval '7 days') AS fresh,
            1.0 - (dense <=> CAST(:qvec AS vector(256))) AS score
     FROM chunks
+    WHERE industry = :industry
     ORDER BY dense <=> CAST(:qvec AS vector(256))
     LIMIT :top_k
     """
@@ -224,6 +250,7 @@ class PgVectorStore(VectorStore):
                 "token_count": c.token_count,
                 "dense": _vec_literal(c.dense),
                 "published_at": c.published_at,
+                "industry": c.industry,
             }
             for c in chunks
         ]
@@ -231,13 +258,17 @@ class PgVectorStore(VectorStore):
             conn.execute(_UPSERT_SQL, params)
         return len(chunks)
 
-    def hybrid_search(self, query: str, dense: list[float], top_k: int) -> Fused:
-        with self._engine.connect() as conn:
+    def hybrid_search(
+        self, query: str, dense: list[float], top_k: int, industry: str = "esg"
+    ) -> Fused:
+        with self._engine.begin() as conn:
+            conn.execute(text(f"SET LOCAL hnsw.ef_search = {EF_SEARCH}"))
             rows = conn.execute(
                 _HYBRID_SQL,
                 {
                     "qvec": _vec_literal(dense),
                     "q": query,
+                    "industry": industry,
                     "prefetch": PREFETCH,
                     "rrf_k": RRF_K,
                     "top_k": top_k,
@@ -248,10 +279,12 @@ class PgVectorStore(VectorStore):
         bm25_n = sum(1 for r in rows if r.in_lex)
         return Fused(hits=hits, dense_n=dense_n, bm25_n=bm25_n)
 
-    def dense_search(self, dense: list[float], top_k: int) -> Fused:
-        with self._engine.connect() as conn:
+    def dense_search(self, dense: list[float], top_k: int, industry: str = "esg") -> Fused:
+        with self._engine.begin() as conn:
+            conn.execute(text(f"SET LOCAL hnsw.ef_search = {EF_SEARCH}"))
             rows = conn.execute(
-                _DENSE_SQL, {"qvec": _vec_literal(dense), "top_k": top_k}
+                _DENSE_SQL,
+                {"qvec": _vec_literal(dense), "industry": industry, "top_k": top_k},
             ).all()
         hits = [_row_to_hit(r, float(r.score)) for r in rows]
         return Fused(hits=hits, dense_n=len(hits), bm25_n=0)
@@ -270,21 +303,36 @@ class PgVectorStore(VectorStore):
             )
             return res.rowcount or 0
 
-    def existing_hashes(self, url: str) -> dict[str, str]:
+    def delete_source(self, source_url: str, industry: str = "esg") -> int:
+        with self._engine.begin() as conn:
+            res = conn.execute(
+                text(
+                    "DELETE FROM chunks WHERE source_url = :src AND industry = :industry"
+                ),
+                {"src": source_url, "industry": industry},
+            )
+            return res.rowcount or 0
+
+    def existing_hashes(self, url: str, industry: str = "esg") -> dict[str, str]:
         with self._engine.connect() as conn:
             rows = conn.execute(
-                text("SELECT id, content_hash FROM chunks WHERE url = :url"), {"url": url}
+                text(
+                    "SELECT id, content_hash FROM chunks "
+                    "WHERE url = :url AND industry = :industry"
+                ),
+                {"url": url, "industry": industry},
             ).all()
         return {r.id: r.content_hash for r in rows}
 
-    def prune_pages(self, source_url: str, keep_urls: list[str]) -> int:
+    def prune_pages(self, source_url: str, keep_urls: list[str], industry: str = "esg") -> int:
         with self._engine.begin() as conn:
             res = conn.execute(
                 text(
                     "DELETE FROM chunks "
-                    "WHERE source_url = :src AND NOT (url = ANY(:keep))"
+                    "WHERE source_url = :src AND industry = :industry "
+                    "AND NOT (url = ANY(:keep))"
                 ),
-                {"src": source_url, "keep": keep_urls},
+                {"src": source_url, "keep": keep_urls, "industry": industry},
             )
             return res.rowcount or 0
 
@@ -299,9 +347,16 @@ class PgVectorStore(VectorStore):
             )
             return res.rowcount or 0
 
-    def count(self) -> int:
+    def count(self, industry: str | None = None) -> int:
         with self._engine.connect() as conn:
-            return int(conn.execute(text("SELECT count(*) FROM chunks")).scalar_one())
+            if industry is None:
+                return int(conn.execute(text("SELECT count(*) FROM chunks")).scalar_one())
+            return int(
+                conn.execute(
+                    text("SELECT count(*) FROM chunks WHERE industry = :industry"),
+                    {"industry": industry},
+                ).scalar_one()
+            )
 
 
 _store: PgVectorStore | None = None

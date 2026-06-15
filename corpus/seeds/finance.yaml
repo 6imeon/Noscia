@@ -1,0 +1,15 @@
+# Noscia Financial Regulation corpus seeds.
+#
+# Curated, narrow, vertical — quality over coverage (rule 11). Authoritative banking
+# supervisors, market regulators, and global standard-setters only; never open-web (rule 13).
+# Seed schema identical to seeds/esg.yaml (see its header for the `crawl:` knobs).
+
+seeds:
+  - { url: https://www.bis.org/bcbs/publications.htm, source_type: framework, org: "Basel Committee (BIS)", cadence: weekly, crawl: { max_depth: 1, max_pages: 30, max_pdfs: 6 } }
+  - { url: https://www.sec.gov/rules-regulations, source_type: regulator, org: "US SEC", cadence: daily }
+  - { url: https://www.fdic.gov/news/, source_type: regulator, org: "US FDIC", cadence: weekly }
+  - { url: https://www.fca.org.uk/publications, source_type: regulator, org: "UK FCA", cadence: weekly }
+  - { url: https://www.esma.europa.eu/publications-and-data, source_type: regulator, org: "ESMA", cadence: weekly }
+  - { url: https://www.iosco.org/publications/, source_type: framework, org: "IOSCO", cadence: monthly }
+  - { url: https://www.fsb.org/publications/, source_type: framework, org: "Financial Stability Board", cadence: weekly }
+  - { url: https://www.cftc.gov/PressRoom/PressReleases, source_type: regulator, org: "US CFTC", cadence: weekly }

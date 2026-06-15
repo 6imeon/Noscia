@@ -1,0 +1,15 @@
+# Noscia Pharma & Drug Regulation corpus seeds.
+#
+# Curated, narrow, vertical — quality over coverage (rule 11). Authoritative drug regulators,
+# harmonisation standards bodies, and trial registries only; never open-web (rule 13).
+# Seed schema identical to seeds/esg.yaml (see its header for the `crawl:` knobs).
+
+seeds:
+  - { url: https://www.fda.gov/drugs/development-approval-process-drugs, source_type: regulator, org: "US FDA", cadence: weekly, crawl: { max_depth: 1, max_pages: 30 } }
+  - { url: https://www.ema.europa.eu/en/news-events/whats-new, source_type: regulator, org: "European Medicines Agency", cadence: weekly }
+  - { url: https://www.ich.org/page/ich-guidelines, source_type: framework, org: "ICH", cadence: monthly, crawl: { max_depth: 1, max_pages: 25, max_pdfs: 8 } }
+  - { url: https://www.who.int/teams/health-product-policy-and-standards/standards-and-specifications, source_type: framework, org: "WHO Health Product Standards", cadence: monthly }
+  - { url: https://www.gov.uk/government/organisations/medicines-and-healthcare-products-regulatory-agency, source_type: regulator, org: "UK MHRA", cadence: weekly }
+  - { url: https://clinicaltrials.gov/, source_type: report, org: "ClinicalTrials.gov", cadence: weekly, crawl: { max_depth: 1, max_pages: 20 } }
+  - { url: https://www.usp.org/health-quality-safety, source_type: framework, org: "US Pharmacopeia", cadence: monthly }
+  - { url: https://www.pmda.go.jp/english/, source_type: regulator, org: "Japan PMDA", cadence: monthly }

@@ -1,0 +1,69 @@
+# Noscia industry catalog — the verticals a user can choose from (MULTI_INDUSTRY.md §4).
+#
+# Static config, NOT a DB table: a vertical is defined by its curated seed list, which is
+# checked-in content. Picking a field here is enough to start crawling its corpus.
+#
+# Each entry:
+#   id    : stable slug — the value stored in `chunks.industry` / `sources.industry`.
+#           Never rename an id once a corpus is crawled under it (it'd orphan the rows).
+#   label : display name in the setup menu / switcher.
+#   blurb : one line shown under the label in the picker card.
+#   icon  : maps to a frontend icon (see web/src/…); free-form string for now.
+#   seeds : path (relative to this file) to the vertical's seed list — today's seed
+#           schema, unchanged (url / source_type / org / cadence / crawl:).
+#
+# A vertical only appears as *loaded* once its seeds have been crawled (sources/chunks
+# exist). Add a vertical by dropping a `seeds/<id>.yaml` and an entry here — see the
+# 10-vertical v1 catalog in corpus/INDUSTRIES.md for the curated seed lists ready to split.
+
+industries:
+  - id: esg
+    label: "ESG & Sustainability"
+    blurb: "Standards, regulators, ratings, and target-setters for corporate sustainability."
+    icon: leaf
+    seeds: seeds/esg.yaml
+  - id: economics
+    label: "Economics & Macro"
+    blurb: "Central banks, statistical agencies, and macroeconomic research."
+    icon: chart
+    seeds: seeds/economics.yaml
+  - id: healthcare
+    label: "Healthcare & Public Health"
+    blurb: "Health agencies, clinical guidelines, and evidence reviews."
+    icon: heart
+    seeds: seeds/healthcare.yaml
+  - id: cybersecurity
+    label: "Cybersecurity"
+    blurb: "Security frameworks, advisories, and threat-intelligence standards."
+    icon: shield
+    seeds: seeds/cybersecurity.yaml
+  - id: ai
+    label: "Artificial Intelligence"
+    blurb: "AI research repositories, governance frameworks, and policy bodies."
+    icon: cpu
+    seeds: seeds/ai.yaml
+  - id: energy
+    label: "Energy & Climate"
+    blurb: "Energy agencies, climate science, and the transition evidence base."
+    icon: bolt
+    seeds: seeds/energy.yaml
+  - id: finance
+    label: "Financial Regulation"
+    blurb: "Banking supervisors, market regulators, and global standard-setters."
+    icon: bank
+    seeds: seeds/finance.yaml
+  - id: agriculture
+    label: "Agriculture & Food"
+    blurb: "Food & agriculture agencies, safety standards, and research institutes."
+    icon: wheat
+    seeds: seeds/agriculture.yaml
+  - id: pharma
+    label: "Pharma & Drug Regulation"
+    blurb: "Drug regulators, harmonisation standards, and trial registries."
+    icon: pill
+    seeds: seeds/pharma.yaml
+  - id: space
+    label: "Space & Aerospace"
+    blurb: "Space agencies, aviation/space regulators, and technical archives."
+    icon: rocket
+    seeds: seeds/space.yaml
