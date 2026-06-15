@@ -308,8 +308,7 @@ export function Landing() {
       <footer className="border-t border-line bg-bg px-8 py-8">
         <div className="mx-auto flex max-w-6xl flex-wrap items-center gap-4 font-mono text-xs text-dim">
           <span className="font-semibold tracking-[0.18em] text-muted">NOSCIA</span>
-          <span>© 2026 · internal</span>
-          <span className="ml-auto">Index-only · self-hosted · cited</span>
+          <span className="ml-auto">© 2026</span>
         </div>
       </footer>
     </div>
