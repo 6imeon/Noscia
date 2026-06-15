@@ -4,6 +4,38 @@ All notable changes to Noscia are recorded here. Updated at the **end of each ph
 (see [IMPLEMENTATION.md](IMPLEMENTATION.md) §7). Format loosely follows
 [Keep a Changelog](https://keepachangelog.com/); dates are absolute.
 
+## Landing page — fluid hero + marketing sections — 2026-06-15
+
+A public marketing page at **`/landing`**, in Noscia's own visual language (Oat palette,
+system sans + SF Mono, caramel accent). Five hero directions were built as standalone
+prototypes and rendered/screenshotted headlessly; the chosen "aurora" direction was ported
+into React.
+
+### Fluid particle hero (`web/src/views/Landing.tsx`)
+- The hero is a field of free-floating gradient blobs that the cursor repels like a fluid.
+  Grounded in Jos Stam's *Stable Fluids* (force, advect, diffuse): repulsion is a smooth
+  outward **force** added to each particle's own velocity (no positional tether), with a
+  viscous drag back to a baseline drift. Modeled as many small particles (SPH-style) so the
+  cursor displaces only the **local** ones, so the field parts and flows back instead of a
+  single blob snapping 180°. Honors `prefers-reduced-motion`.
+- Routed by path in `main.tsx`: the console stays at `/`, the landing renders at `/landing`,
+  with no router dependency added.
+
+### Content sections
+- "What it does" cards, a plain-language search showcase with a cited-results product mock,
+  and a closing CTA, on the warm palette with sage-green accents. Scroll-reveal via
+  `IntersectionObserver` plus light scroll parallax; entrance and reveal animations live in
+  `web/src/styles/theme.css`.
+
+### Removed
+- An earlier experiment streamed a third-party hosted background video (external egress,
+  choppy playback). It and its 30 MB asset were dropped in favor of the self-contained
+  particle hero.
+
+### Gates
+- Web: `tsc` typecheck clean. The landing is presentational; no contract or API surface
+  changed, so the server tests and the eval gate are unaffected.
+
 ## Phase D — Full vertical catalog + second live corpus — 2026-06-15
 
 The multi-industry feature is proven end-to-end: ten selectable verticals, embeddings

@@ -1,71 +1,101 @@
+<div align="center">
+
 # Noscia
 
-A vertical, ESG-domain neural search app — Exa-style retrieval over a curated sustainability corpus, with cited passages and an agentic entity-search mode. A company-internal tool: self-hosted via Docker behind the company's SSO, one shared index. Runs locally (`uvicorn` + `pnpm dev`) for development.
+**Vertical neural search for the fields that matter.**
 
-## Documents
+Retrieval over a curated, authoritative corpus with cited passages and an agentic
+entity-search mode. No open-web crawl, no invented sources.
 
-- **[SPEC.md](SPEC.md)** — what the product is and why (architecture, search pipeline, entity search, constraints).
-- **[IMPLEMENTATION.md](IMPLEMENTATION.md)** — current build plan: verified stack research, hard constraints, phase-by-phase checklist, the selected frontend design (§8), and deployment targets (§9).
-- **[CHANGELOG.md](CHANGELOG.md)** — what changed, updated at the end of each phase.
-- **[design/mockups/](design/mockups/)** — interactive UI explorations. Selected direction: `design-1-research-console.html`.
+![Python](https://img.shields.io/badge/Python-3.12-3776AB?logo=python&logoColor=white)
+![Node](https://img.shields.io/badge/Node-24.14-339933?logo=nodedotjs&logoColor=white)
+![FastAPI](https://img.shields.io/badge/FastAPI-0.136-009688?logo=fastapi&logoColor=white)
+![React](https://img.shields.io/badge/React-19-61DAFB?logo=react&logoColor=black)
+![Postgres](https://img.shields.io/badge/Postgres-ParadeDB-4169E1?logo=postgresql&logoColor=white)
+![License](https://img.shields.io/badge/license-internal-555)
 
-## Status
+</div>
 
-Phase 2 (quality + freshness) in progress: an **eval gate** (nDCG@10 / MRR /
-Recall@10 on a held-out ESG set, scored at source-domain level), **deep crawl** (each
-authoritative domain is crawled in depth — bounded same-domain BFS — across 21 sources,
-clean prose with cookie/consent boilerplate stripped, with **PDF documents** extracted too
-where the substance lives there, not in HTML — TCFD reports, EFRAG/GRI guidance — from
-the seed's own domain or an operator-approved publications CDN, never the open web),
-**incremental crawl** (HTTP 304 + content-hash diff + page-level prune, adaptive
-cadence), **URL canonicalization** (cosmetic `?page=1`/tracking variants folded so results
-don't duplicate), an optional **BYOK answer layer** (one query-focused answer synthesized over the
-retrieved passages, with citations — grounded in the index, never the open web), **publication-date
-extraction** with a **news-only recency prior** (eval-gated tie-break so fresher news edges out stale
-news — evergreen standards are never demoted for age), and a LoRA **fine-tune pipeline** that runs locally and is honestly eval-gated.
-Search is **index-only**: no third-party search providers, no external data egress —
-depth comes from crawling our 21 curated authoritative domains, never the open web (rule 13).
-Phase 1 (core ESG search) — crawl → index → hybrid → rerank → highlighted, cited results —
-is complete. See [CHANGELOG.md](CHANGELOG.md) and [IMPLEMENTATION.md](IMPLEMENTATION.md) §7.
+Noscia is a company-internal neural-search app. It answers questions with **cited passages
+from a corpus you control**, one vertical at a time (ESG, economics, healthcare, and more),
+and it never reaches out to a third-party search engine. Self-hosted via Docker behind your
+SSO; runs locally for development.
 
-### Run the dev loop
+## Highlights
 
-The whole stack runs in Docker — `postgres` + `api` (:8000) + `web` (:5180). No manual
-`uvicorn` / `pnpm dev`:
+- 🔎 **Cited, not guessed.** Hybrid dense + BM25 retrieval, reranked with a cross-encoder.
+  Every result carries the source passage and a link, so an answer is evidence you can open.
+- 🧭 **Ten verticals, on demand.** Each is its own authoritative corpus, embedded the moment
+  it is first picked. Switching is instant and nothing bleeds across fields.
+- 🧱 **Index-only and private.** Search runs entirely on your own index. Queries and data
+  never leave your network; only optional BYOK reasoning calls a provider.
+- 🧩 **Entity search.** An agent fills a structured record from the corpus alone, leaving any
+  field it cannot cite blank. Blank beats hallucinated.
+- 📈 **Eval-gated.** Every embedding or reranker change is gated on nDCG@10 / MRR / Recall@10
+  against a held-out query set, scored at source-domain level.
 
-```bash
-docker compose up        # first run builds the api image (torch + Playwright — large)
-```
+## Quick start
 
-Open **http://localhost:5180**. Backend source (`server/src`) and frontend source (`web/`)
-are bind-mounted, so edits hot-reload in the containers. Models cache under `data/` (shared
-with the host, so no re-download). Put `OPENROUTER_API_KEY` in a root `.env` (see
-`.env.example`) — compose passes it into `api` for BYOK reasoning; it's never baked into the image.
-
-On a **fresh** database, ingest the seed corpus once:
+The whole stack runs in Docker: `postgres` + `api` (:8000) + `web` (:5180).
 
 ```bash
-docker compose exec api uv run python -m noscia.ingest.run    # crawl seeds → embed → index
+docker compose up        # first run builds the api image (torch + Playwright, large)
 ```
 
-Phase 2 tooling (inside the api container, or `cd server` on the host):
+Open **http://localhost:5180** for the app, or **http://localhost:5180/landing** for the
+marketing page. Backend (`server/src`) and frontend (`web/`) are bind-mounted, so edits
+hot-reload in the containers. Models cache under `data/`. Put `OPENROUTER_API_KEY` in a root
+`.env` (see `.env.example`) for BYOK reasoning; it is never baked into the image.
+
+On a fresh database, ingest a vertical once:
 
 ```bash
-docker compose exec api uv run python -m noscia.train.eval        # eval (nDCG@10 / MRR / Recall@10)
-docker compose exec api uv run python -m noscia.ingest.run --due  # recrawl only sources past cadence
+docker compose exec api uv run python -m noscia.ingest.run                  # default (esg)
+docker compose exec api uv run python -m noscia.ingest.run --industry economics
 ```
 
-Fine-tuning is offline and host-only (the `train` deps aren't in the image):
+Common tooling, inside the api container:
+
+```bash
+docker compose exec api uv run python -m noscia.train.eval --industry esg   # nDCG@10 / MRR / Recall@10
+docker compose exec api uv run python -m noscia.ingest.run --due            # recrawl sources past cadence
+```
+
+Fine-tuning is offline and host-only (the `train` deps are not in the image):
 
 ```bash
 cd server && uv sync --group train
-uv run --group train python -m noscia.train.synth                        # BYOK synthetic pairs
-uv run --group train python -m noscia.train.finetune --train --compare   # LoRA fine-tune, eval-gated
+uv run --group train python -m noscia.train.finetune --train --compare      # LoRA, eval-gated
 ```
 
-> Prefer running natively? The host loop still works: `docker compose up -d postgres`, then
-> `cd server && uv run uvicorn noscia.app:app --reload` and `pnpm dev`.
+> Prefer running natively? `docker compose up -d postgres`, then
+> `cd server && uv run uvicorn noscia.app:app --reload`, and `pnpm dev` in `web/`.
 
-## Stack (planned)
+## Project layout
 
-React + TypeScript + Vite (pnpm) · Python + FastAPI · Postgres + pgvector + `pg_search` BM25 (one datastore) · crawl4ai · Qwen3-Embedding-0.6B · bge-reranker-v2-m3 · BYOK LLM providers.
+```
+noscia/
+├── server/   FastAPI backend (uv, PyPA src-layout, package `noscia`)
+├── web/      Vite + React + TypeScript frontend (pnpm)
+├── corpus/   seed lists, the industry catalog, and eval sets
+├── data/     Postgres volume + model cache (gitignored)
+└── design/   UI explorations
+```
+
+## Documentation
+
+- **[SPEC.md](SPEC.md)** : what the product is and why (architecture, search pipeline,
+  entity search, constraints).
+- **[IMPLEMENTATION.md](IMPLEMENTATION.md)** : build plan, hard constraints, and the
+  phase-by-phase checklist.
+- **[CHANGELOG.md](CHANGELOG.md)** : what changed, updated at the end of each phase.
+- **[CLAUDE.md](CLAUDE.md)** : working conventions and the pinned-versions ledger.
+
+## Stack
+
+React 19 · TypeScript · Vite (pnpm) · FastAPI (uv) · Postgres + pgvector + `pg_search` BM25
+(ParadeDB) · crawl4ai · Qwen3-Embedding-0.6B · bge-reranker-v2-m3 · BYOK LLM providers.
+
+## License
+
+Internal. Company-internal use only; not for public distribution.
