@@ -82,7 +82,7 @@ noscia/
 ├── SPEC.md  IMPLEMENTATION.md   ← what/why + build plan
 ├── CLAUDE.md                    ← agent working notes / conventions (Phase 0)
 ├── README.md
-├── LICENSE                      ← proprietary / company-internal
+├── LICENSE                      ← MIT
 ├── .editorconfig
 ├── .github/workflows/ci.yml     ← lint + test on PR (both ecosystems)
 ├── package.json                 ← root workspace (private); scripts: dev / lint / test

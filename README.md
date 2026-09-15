@@ -12,14 +12,14 @@ entity-search mode. No open-web crawl, no invented sources.
 ![FastAPI](https://img.shields.io/badge/FastAPI-0.136-009688?logo=fastapi&logoColor=white)
 ![React](https://img.shields.io/badge/React-19-61DAFB?logo=react&logoColor=black)
 ![Postgres](https://img.shields.io/badge/Postgres-ParadeDB-4169E1?logo=postgresql&logoColor=white)
-![License](https://img.shields.io/badge/license-internal-555)
+![License](https://img.shields.io/badge/license-MIT-555)
 
 </div>
 
-Noscia is a company-internal neural-search app. It answers questions with **cited passages
+Noscia is a self-hosted neural-search app. It answers questions with **cited passages
 from a corpus you control**, one vertical at a time (ESG, economics, healthcare, and more),
-and it never reaches out to a third-party search engine. Self-hosted via Docker behind your
-SSO; runs locally for development.
+and it never reaches out to a third-party search engine. Deploy it via Docker behind your
+own SSO; runs locally for development.
 
 ## Highlights
 
@@ -98,4 +98,4 @@ React 19 · TypeScript · Vite (pnpm) · FastAPI (uv) · Postgres + pgvector + `
 
 ## License
 
-Internal. Company-internal use only; not for public distribution.
+[MIT](LICENSE) © 2026 6imeon.
